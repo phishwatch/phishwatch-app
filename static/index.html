@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PhishWatch – Recent Scans</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --card-bg: #ffffff;
+      --border-subtle: #e5e7eb;
+      --primary: #2563eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --safe: #16a34a;
+      --suspicious: #f97316;
+      --malicious: #dc2626;
+      --radius-card: 14px;
+      --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 920px;
+      margin: 40px auto;
+      padding: 0 16px 40px;
+      background: radial-gradient(circle at top left, #e5edff 0, var(--bg) 52%);
+      color: var(--text-main);
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    .header-title {
+      font-size: 26px;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .header-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background: var(--card-bg);
+      padding: 16px 16px 18px;
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-card);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      text-align: left;
+    }
+
+    th {
+      background: #f3f4f6;
+      font-weight: 600;
+      font-size: 12px;
+      color: #4b5563;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .muted {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: white;
+      opacity: 0.85;
+    }
+
+    .badge-safe { background: var(--safe); }
+    .badge-suspicious { background: var(--suspicious); }
+    .badge-malicious { background: var(--malicious); }
+
+    @media (max-width: 700px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div>
+      <div class="header-title">Recent Scans</div>
+      <div class="header-sub">Showing the most recent results stored by the API.</div>
+    </div>
+    <a href="/">← Back to scanner</a>
+  </header>
+
+  <section class="card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 32%;">Timestamp (UTC)</th>
+          <th>URL</th>
+          <th style="width: 14%;">Verdict</th>
+          <th style="width: 10%;">Score</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="4" class="muted">Loading…</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <script>
+    const tbody = document.getElementById("tbody");
+
+    function verdictBadge(verdict) {
+      const span = document.createElement("span");
+      span.classList.add("badge");
+      if (verdict === "safe") span.classList.add("badge-safe");
+      else if (verdict === "suspicious") span.classList.add("badge-suspicious");
+      else span.classList.add("badge-malicious");
+
+      const dot = document.createElement("span");
+      dot.classList.add("badge-dot");
+      const text = document.createElement("span");
+      text.textContent = verdict.toUpperCase();
+
+      span.appendChild(dot);
+      span.appendChild(text);
+      return span;
+    }
+
+    async function loadRecent() {
+      try {
+        const response = await fetch("/api/recent-scans?limit=20");
+        if (!response.ok) {
+          tbody.innerHTML = "<tr><td colspan='4'>Error loading recent scans.</td></tr>";
+          return;
+        }
+        const data = await response.json();
+        const items = data.items || [];
+
+        if (items.length === 0) {
+          tbody.innerHTML = "<tr><td colspan='4' class='muted'>No scans yet.</td></tr>";
+          return;
+        }
+
+        tbody.innerHTML = "";
+        items.forEach(item => {
+          const tr = document.createElement("tr");
+
+          const ts = document.createElement("td");
+          ts.textContent = item.timestamp;
+          tr.appendChild(ts);
+
+          const urlTd = document.createElement("td");
+          urlTd.textContent = item.url;
+          tr.appendChild(urlTd);
+
+          const verdictTd = document.createElement("td");
+          verdictTd.appendChild(verdictBadge(item.verdict));
+          tr.appendChild(verdictTd);
+
+          const scoreTd = document.createElement("td");
+          scoreTd.textContent = item.score;
+          tr.appendChild(scoreTd);
+
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error(err);
+        tbody.innerHTML =
+          "<tr><td colspan='4'>Unexpected error loading recent scans.</td></tr>";
+      }
+    }
+
+    loadRecent();
+  </script>
+</body>
+</html>

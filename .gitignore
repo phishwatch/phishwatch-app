@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+
+# Local data
+data/
+*.db
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
