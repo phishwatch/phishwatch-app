@@ -4,6 +4,11 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
+# Verdict constants (used by scoring.py)
+VERDICT_SAFE = "SAFE"
+VERDICT_SUSPICIOUS = "SUSPICIOUS"
+VERDICT_MALICIOUS = "MALICIOUS"
+
 # -------------------------------
 # Types
 # -------------------------------

@@ -1,56 +1,46 @@
-from __future__ import annotations
-
+from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from urllib.parse import urlparse
 
-from fastapi import FastAPI
-from pydantic import BaseModel
-
+# Local imports (these files live next to main.py inside /app/app/)
 from .models import (
     ScanResult,
-    ExternalInfo,
-    ExternalReputation,
     SignalFinding,
+    ExternalReputation,
+    ExternalInfo,
 )
-from .heuristics import analyze_url_with_heuristics
 from .resolver import resolve_url
+from .heuristics import analyze_url_with_heuristics
 from .explain import (
     indicators_to_signals,
-    score_from_signals,
-    verdict_from_score,
     sort_signals,
-    summary_from_signals,  # make sure this exists in explain.py
+    summary_from_signals,
 )
-
+from .scoring import score_from_signals, verdict_from_score
 
 app = FastAPI(title="PhishWatch API", version="0.1.0")
 
-from fastapi import FastAPI
-
-app = FastAPI(title="PhishWatch API")
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-from fastapi.middleware.cors import CORSMiddleware
-
+# DEV CORS ONLY
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"chrome-extension://.*",
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-def root():
-    return {"status": "ok", "docs": "/docs"}
-
+@app.options("/api/check")
+def options_check():
+    return Response(status_code=200)
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/")
+def root():
+    return {"status": "ok", "docs": "/docs"}
 
 
 class CheckRequest(BaseModel):
@@ -89,7 +79,7 @@ def check_url(payload: CheckRequest) -> ScanResult:
     # 3) Indicators → explainable signals
     signals = indicators_to_signals(indicators)
 
-    # 3b) Add obfuscation signal: multiple redirects
+    # 3b) Obfuscation: multiple redirects
     if len(resolved.redirect_chain) >= 3:
         signals.append(
             SignalFinding(
@@ -100,10 +90,8 @@ def check_url(payload: CheckRequest) -> ScanResult:
             )
         )
 
-    # 3c) Sort signals (high → medium → low)
+    # 4) Score + verdict (initial)
     signals = sort_signals(signals)
-
-    # 4) Scoring + verdict
     risk_score = score_from_signals(signals)
     verdict = verdict_from_score(risk_score)
 
@@ -112,12 +100,29 @@ def check_url(payload: CheckRequest) -> ScanResult:
     uses_https = resolved.final_url.startswith("https://")
     has_punycode = "xn--" in host
 
+    # --- Step 1A: Guaranteed signal for insecure HTTP (no TLS) ---
+    if resolved.final_url.startswith("http://"):
+        signals.append(
+            SignalFinding(
+                id="insecure_http",
+                severity="medium",
+                explanation="This page is served over insecure HTTP (no TLS).",
+                evidence={"final_url": resolved.final_url},
+            )
+        )
+        signals = sort_signals(signals)
+        risk_score = score_from_signals(signals)
+        verdict = verdict_from_score(risk_score)
+        if verdict == "SAFE":
+            verdict = "SUSPICIOUS"
+        risk_score = max(risk_score, 20)
+
     # Hardening: punycode can never be SAFE
     if has_punycode and verdict == "SAFE":
         verdict = "SUSPICIOUS"
         risk_score = max(risk_score, 20)
 
-    # 6) Risk band + summary (extension-ready)
+    # 6) Risk band + summary
     risk_band = risk_band_from_score(risk_score)
     summary = summary_from_signals(signals)
 

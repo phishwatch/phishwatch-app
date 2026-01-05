@@ -1,33 +1,51 @@
 from __future__ import annotations
 
-from typing import List, Dict, Tuple
+from typing import Dict, List, Tuple
 
-from .models import (
-    VERDICT_SAFE,
-    VERDICT_SUSPICIOUS,
-    VERDICT_MALICIOUS,
-)
+from .models import SignalFinding
+from .explain import WEIGHTS
+
+# -------------------------------
+# Signal-based scoring
+# -------------------------------
+
+def score_from_signals(signals: List[SignalFinding]) -> int:
+    score = sum(WEIGHTS.get(s.id, 0) for s in signals)
+    return min(100, score)
 
 
 # -------------------------------
-# Verdict Mapping
+# Verdict constants (local)
 # -------------------------------
+
+VERDICT_SAFE = "SAFE"
+VERDICT_SUSPICIOUS = "SUSPICIOUS"
+VERDICT_MALICIOUS = "MALICIOUS"
+
+
+# -------------------------------
+# Signal-based scoring
+# -------------------------------
+def score_from_signals(signals: List[SignalFinding]) -> int:
+    score = sum(WEIGHTS.get(s.id, 0) for s in signals)
+    return min(100, score)
+
 
 def verdict_from_score(score: int) -> str:
     """
     Map final numeric score to verdict.
+    Keep this aligned with your product semantics.
     """
-    if score >= 70:
+    if score >= 60:
         return VERDICT_MALICIOUS
-    elif score >= 40:
+    if score >= 20:
         return VERDICT_SUSPICIOUS
     return VERDICT_SAFE
 
 
 # -------------------------------
-# Scoring Engine
+# Optional rules layer (reputation, confidence bumps)
 # -------------------------------
-
 def apply_scoring_rules(
     base_score: int,
     explanations: List[str],
@@ -35,25 +53,8 @@ def apply_scoring_rules(
     have_reputation_data: bool = False,
     gsb_status: str | None = None,
     vt_status: str | None = None,
-    **_ignored: object,  # <-- prevents crashes if callers pass extra keywords
+    **_ignored: object,  # prevents crashes if callers pass extra keywords
 ) -> Tuple[int, str, List[str]]:
-    """
-    Apply scoring rules, cap score, produce final verdict and explanation list.
-
-    Inputs:
-        base_score: total score from heuristics
-        explanations: list of human-readable explanation strings
-        indicators: dict of heuristic indicators
-        have_reputation_data: whether reputation sources were checked
-        gsb_status: "malicious" / "suspicious" / "clean" / None
-        vt_status: "malicious" / "clean" / None
-
-    Returns:
-        final_score (0–100),
-        final_verdict ("safe", "suspicious", "malicious"),
-        explanations (possibly augmented)
-    """
-
     score = base_score
 
     # --- Reputation rules ---
@@ -76,9 +77,7 @@ def apply_scoring_rules(
         fired = sum(1 for _, val in indicators.items() if val)
         if score >= 50 and fired >= 3:
             score += 10
-            explanations.append(
-                "Multiple indicators fired with no reputation data available (confidence bump)."
-            )
+            explanations.append("Multiple indicators fired with no reputation data available (confidence bump).")
 
     # --- Final score cleanup ---
     score = max(0, min(100, score))
