@@ -11,7 +11,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: msg.url }),
+        body: JSON.stringify({ url: msg.url, redirect_count: msg.redirect_count ?? 0 }),
       });
 
       if (!res.ok) {
