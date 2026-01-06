@@ -76,6 +76,10 @@ class ScanResult(BaseModel):
     risk_score: int
     verdict: Verdict
 
+    # Human-facing interpretation
+    risk_band: Optional[str] = None
+    summary: str
+
     signals: List[SignalFinding] = Field(default_factory=list)
 
 
