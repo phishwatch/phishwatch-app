@@ -1,3 +1,6 @@
+// IMPORTANT:
+// This file is wrapped in a single IIFE (() => { ... })();
+// Do not add/remove braces without checking the final closure.
 // PhishWatch content script
 console.log("PhishWatch content script loaded:", window.location.href);
 
