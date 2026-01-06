@@ -136,21 +136,36 @@ def sort_signals(signals: List[SignalFinding]) -> List[SignalFinding]:
 
 
 def summary_from_signals(signals: List[SignalFinding]) -> str:
-    ids = {s.id for s in signals}
-
-    if "credential_keywords" in ids or "mismatched_brand" in ids or "brand_lookalike" in ids:
-        return "Likely phishing: the link suggests credential capture or brand impersonation."
-    if "punycode_idn" in ids and "url_shortener" in ids:
-        return "Caution: the link hides its destination and uses a lookalike-style domain."
-    if "punycode_idn" in ids:
-        return "Caution: the domain uses punycode (IDN), which can disguise lookalike characters."
-    if "multi_redirect" in ids and "url_shortener" in ids:
-        return "Caution: the link hides its destination behind a shortener and multiple redirects."
-    if "multi_redirect" in ids:
-        return "Caution: the link uses multiple redirects, which can hide the true destination."
-    if "url_shortener" in ids:
-        return "Caution: the link uses a URL shortener, hiding the real destination."
     if not signals:
         return "No high-confidence phishing signals detected."
 
-    return sort_signals(signals)[0].explanation
+    ids = {s.id for s in signals}
+
+    # 1) Credential harvesting (strongest signal)
+    if "credential_keywords" in ids:
+        return "High risk: this link appears designed to capture login credentials."
+
+    # 2) Brand impersonation
+    if "mismatched_brand" in ids or "brand_lookalike" in ids:
+        return "High risk: the domain appears to be impersonating a trusted brand."
+
+    # 3) Hidden destination patterns
+    if "url_shortener" in ids and "multi_redirect" in ids:
+        return "Caution: the destination is hidden behind a short link and multiple redirects."
+
+    if "multi_redirect" in ids:
+        return "Caution: multiple redirects are used, which can hide the true destination."
+
+    if "url_shortener" in ids:
+        return "Caution: the destination is hidden behind a shortened link."
+
+    # 4) Domain / transport concerns
+    if "punycode_idn" in ids:
+        return "Caution: the domain uses lookalike characters (IDN/punycode)."
+
+    if "insecure_http" in ids:
+        return "Caution: this page loads over HTTP (no encryption). Avoid entering sensitive data."
+
+    # 5) Fallback: explain the most severe signal
+    most_severe = sort_signals(signals)[0]
+    return most_severe.explanation
