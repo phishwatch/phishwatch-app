@@ -1,319 +1,328 @@
-// IMPORTANT:
-// This file is wrapped in a single IIFE (() => { ... })();
-// Do not add/remove braces without checking the final closure.
-// PhishWatch content script
-console.log("PhishWatch content script loaded:", window.location.href);
+// PhishWatch MV3 — content.js
+// Minimal, robust content script that:
+// 1) Always shows a visible "Scanning…" overlay on non-trusted pages
+// 2) Sends the current URL to the background service worker
+// 3) Renders a simple result when a response arrives
+// 4) Avoids SPA + Gmail noise (no repeated rescans, hard-skip Gmail)
+
+/* =========================
+   Config / guards
+   ========================= */
 
 (() => {
-  const ID = "phishwatch-overlay";
-  let lastHref = window.location.href;
-  let scanInFlight = false;
-  let lastScanAt = 0;
+  "use strict";
+
+  // --- "Trusted app" / noisy surfaces to SKIP entirely ---
+  // Even though Gmail may be part of your wider idea, for this MVP we skip it
+  // to avoid constant SPA route updates + DOM churn.
+  const SKIP_HOSTS = new Set([
+    "mail.google.com",
+    "inbox.google.com",
+    "calendar.google.com",
+    "docs.google.com",
+    "drive.google.com",
+  ]);
+
+  // Don’t run in iframes (prevents multiple overlays on embedded content).
+  if (window.top !== window) return;
+
+  const host = location.hostname;
+
+// Skip Gmail + Google apps
+if (SKIP_HOSTS.has(host)) return;
+
+// Skip only the PhishWatch API/docs (keeps other localhost pages testable)
+if ((host === "127.0.0.1" || host === "localhost") && (
+  location.pathname.startsWith("/docs") ||
+  location.pathname.startsWith("/openapi.json") ||
+  location.pathname.startsWith("/redoc") ||
+  location.pathname.startsWith("/health") ||
+  location.pathname.startsWith("/api/")
+)) {
+  return;
+}
+console.log("[PhishWatch] content.js loaded on", location.href);
+document.documentElement.setAttribute("data-phishwatch-loaded", "1");
+
+  // Some special Chrome pages are not inject-able anyway; this keeps logs clean.
+  if (!location.href.startsWith("http://") && !location.href.startsWith("https://")) return;
+
+  /* =========================
+     Overlay (UI)
+     ========================= */
+
+  const OVERLAY_ID = "phishwatch-overlay";
+  let overlayEl = null;
 
   function ensureOverlay() {
-    let el = document.getElementById(ID);
-    if (el) return el;
+    if (overlayEl && document.contains(overlayEl)) return overlayEl;
 
-    el = document.createElement("div");
-    el.id = ID;
+    overlayEl = document.createElement("div");
+    overlayEl.id = OVERLAY_ID;
 
-    el.style.position = "fixed";
-    el.style.right = "24px";
-    el.style.bottom = "24px";
-    el.style.zIndex = "2147483647";
-    el.style.width = "420px";
-    el.style.maxWidth = "calc(100vw - 48px)";
-    el.style.background = "rgba(10, 16, 28, 0.92)";
-    el.style.color = "#fff";
-    el.style.border = "1px solid rgba(255,255,255,0.10)";
-    el.style.borderRadius = "14px";
-    el.style.boxShadow = "0 12px 32px rgba(0,0,0,0.35)";
-    el.style.fontFamily =
-      "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif";
-    el.style.backdropFilter = "blur(10px)";
-    el.style.overflow = "hidden";
+    // Keep it simple + highly visible.
+    overlayEl.style.position = "fixed";
+    overlayEl.style.top = "16px";
+    overlayEl.style.right = "16px";
+    overlayEl.style.zIndex = "2147483647";
+    overlayEl.style.maxWidth = "360px";
+    overlayEl.style.padding = "12px 14px";
+    overlayEl.style.borderRadius = "12px";
+    overlayEl.style.boxShadow = "0 8px 24px rgba(0,0,0,.18)";
+    overlayEl.style.fontFamily = "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    overlayEl.style.fontSize = "13px";
+    overlayEl.style.lineHeight = "1.35";
+    overlayEl.style.color = "#111";
+    overlayEl.style.background = "rgba(255,255,255,.96)";
+    overlayEl.style.border = "1px solid rgba(0,0,0,.10)";
+    overlayEl.style.backdropFilter = "blur(6px)";
+    overlayEl.style.pointerEvents = "auto"; // allow copy/select if you want later
 
-    el.innerHTML = `
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:14px 14px 8px 14px;">
-        <div>
-          <div style="font-weight:800;font-size:20px;letter-spacing:0.2px;">PhishWatch</div>
-          <div id="pw-sub" style="opacity:0.85;margin-top:6px;font-size:14px;">Scanning this page…</div>
+    // Initial state
+    overlayEl.innerHTML = `
+      <div style="font-weight:700; margin-bottom:4px;">PhishWatch</div>
+      <div id="phishwatch-status" style="display:flex; gap:8px; align-items:center;">
+        <span aria-hidden="true">⏳</span>
+        <span>Scanning…</span>
+      </div>
+      <div id="phishwatch-detail" style="margin-top:8px; color:#333; opacity:.9;">
+        ${escapeHtml(location.href)}
+      </div>
+    `;
+
+    // Append ASAP (even before DOMContentLoaded if possible).
+    // If body isn't available yet, fall back to documentElement.
+    const mount = document.body || document.documentElement;
+    mount.appendChild(overlayEl);
+
+    return overlayEl;
+  }
+
+  function setOverlayScanning(targetUrl) {
+    const el = ensureOverlay();
+    const status = el.querySelector("#phishwatch-status");
+    const detail = el.querySelector("#phishwatch-detail");
+    if (status) status.innerHTML = `<span aria-hidden="true">⏳</span><span>Scanning…</span>`;
+    if (detail) detail.textContent = url;
+  }
+
+  function setOverlayResult(result) {
+    const el = ensureOverlay();
+    const status = el.querySelector("#phishwatch-status");
+    const detail = el.querySelector("#phishwatch-detail");
+
+    // You said your API returns ScanResult; keep this tolerant to different shapes.
+    // Prefer these if present: verdict, risk_band, score, summary.
+    const verdict = String(result?.risk_band ?? result?.verdict ?? "unknown").toUpperCase();
+    const score = typeof result?.score === "number" ? result.score : null;
+    const summary = result?.summary ?? null;
+
+    const badge = formatVerdictBadge(verdict);
+    const scoreLine = score !== null ? `Score: <b>${score}</b>` : "";
+    const summaryLine = summary ? `<div style="margin-top:6px;">${escapeHtml(String(summary))}</div>` : "";
+
+  if (status) {
+    const isRisky =
+    verdict === "HIGH" ||
+    verdict === "MALICIOUS";
+
+  const icon = isRisky ? "⚠️" : "✅";
+
+  status.innerHTML = `
+    <span aria-hidden="true">${icon}</span>
+    <span>${badge}</span>
+  `;
+}
+
+    if (detail) {
+      detail.innerHTML = `
+        <div style="color:#333; opacity:.95;">
+          ${scoreLine}
+          ${summaryLine}
         </div>
-        <button id="pw-close" aria-label="Close" style="all:unset;cursor:pointer;opacity:0.7;font-size:22px;line-height:1;">×</button>
-      </div>
-
-      <div id="pw-body" style="padding:0 14px 14px 14px;font-size:13px;line-height:1.35;opacity:0.95;"></div>
-
-      <div id="pw-toast" style="display:none;margin:0 14px 14px 14px;padding:10px;border-radius:10px;
-        border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.06);opacity:0.95;"></div>
-    `;
-
-    document.documentElement.appendChild(el);
-
-    el.querySelector("#pw-close").addEventListener("click", () => el.remove());
-
-    return el;
+      `;
+    }
   }
 
-  function setOverlay(statusLine, bodyHtml = "") {
+  function setOverlayError(message) {
     const el = ensureOverlay();
-    const sub = el.querySelector("#pw-sub");
-    const body = el.querySelector("#pw-body");
-    if (sub) sub.textContent = statusLine;
-    if (body) body.innerHTML = bodyHtml;
+    const status = el.querySelector("#phishwatch-status");
+    const detail = el.querySelector("#phishwatch-detail");
+    if (status) status.innerHTML = `<span aria-hidden="true">⚠️</span><span><b>Error</b></span>`;
+    if (detail) detail.textContent = message;
   }
 
-  function toast(msg) {
-    const el = ensureOverlay();
-    const t = el.querySelector("#pw-toast");
-    if (!t) return;
-    t.textContent = msg;
-    t.style.display = "block";
-    setTimeout(() => {
-      t.style.display = "none";
-      t.textContent = "";
-    }, 1200);
+  function formatVerdictBadge(v) {
+    const text = String(v);
+    // Tiny, neutral badge. (No CSS files, no refactors.)
+    return `<span style="
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:rgba(0,0,0,.04);
+      font-weight:600;
+    ">${escapeHtml(text)}</span>`;
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
-  function severityRank(sev) {
-    const s = String(sev || "").toLowerCase();
-    if (s === "high") return 3;
-    if (s === "medium") return 2;
-    if (s === "low") return 1;
-    return 0;
-  }
-
-  function pill(text) {
-    return `<span style="display:inline-block;padding:4px 10px;border-radius:999px;
-      border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);font-size:12px;opacity:0.95;">${escapeHtml(
-        text
-      )}</span>`;
-  }
-
-  function renderResult(data) {
-    const verdict = data?.verdict ?? "UNKNOWN";
-    const score = data?.risk_score ?? "?";
-    const riskBand = data?.risk_band ?? "";
-    const summary = data?.summary ?? "";
-    const finalUrl = data?.final_url ?? "";
-
-    const signalsRaw = Array.isArray(data?.signals) ? data.signals : [];
-    const signals = signalsRaw
-      .slice()
-      .sort((a, b) => severityRank(b?.severity) - severityRank(a?.severity));
-
-    const top = signals.slice(0, 2);
-    const rest = signals.slice(2);
-
-    const topHtml = top
-      .map((s) => {
-        const sev = String(s?.severity || "info").toUpperCase();
-        const exp = escapeHtml(s?.explanation || "");
-        const dot =
-          sev === "HIGH"
-            ? "●"
-            : sev === "MEDIUM"
-            ? "●"
-            : sev === "LOW"
-            ? "●"
-            : "●";
-        return `
-          <div style="margin-top:10px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div style="font-weight:800;font-size:12px;opacity:0.9;">${dot} ${sev}</div>
-            </div>
-            <div style="margin-top:6px;font-size:14px;opacity:0.95;">${exp}</div>
-          </div>
-        `;
-      })
-      .join("");
-
-    const restHtml = rest
-      .map((s) => {
-        const sev = String(s?.severity || "info").toUpperCase();
-        const exp = escapeHtml(s?.explanation || "");
-        return `
-          <div style="margin-top:10px;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.03);">
-            <div style="font-weight:700;font-size:12px;opacity:0.85;">${sev}</div>
-            <div style="margin-top:6px;font-size:13px;opacity:0.92;">${exp}</div>
-          </div>
-        `;
-      })
-      .join("");
-
-    const headerRow = `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-        <div style="font-weight:900;font-size:24px;letter-spacing:0.4px;">${escapeHtml(
-          verdict
-        )}</div>
-        ${pill(`Risk ${score}`)}
-      </div>
-      ${
-        summary
-          ? `<div style="opacity:0.92;font-size:15px;margin-bottom:10px;">${escapeHtml(
-              summary
-            )}</div>`
-          : ""
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (m) => {
+      switch (m) {
+        case "&": return "&amp;";
+        case "<": return "&lt;";
+        case ">": return "&gt;";
+        case '"': return "&quot;";
+        case "'": return "&#039;";
+        default: return m;
       }
-      <div style="opacity:0.75;margin-bottom:10px;font-size:13px;">
-        Final URL: <span style="opacity:0.9;">${escapeHtml(finalUrl)}</span>
-      </div>
-      ${
-        riskBand
-          ? `<div style="opacity:0.65;margin-bottom:12px;font-size:12px;">Band: ${escapeHtml(
-              riskBand
-            )}</div>`
-          : `<div style="margin-bottom:12px;"></div>`
-      }
-    `;
-
-    const actions = `
-      <div style="display:flex;gap:10px;margin:10px 0 6px 0;">
-        <button id="pw-rescan" style="all:unset;cursor:pointer;padding:10px 14px;border-radius:12px;
-          border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);font-weight:700;">
-          Re-scan
-        </button>
-        <button id="pw-copy" style="all:unset;cursor:pointer;padding:10px 14px;border-radius:12px;
-          border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);font-weight:700;">
-          Copy report
-        </button>
-        ${
-          rest.length
-            ? `<button id="pw-toggle" style="all:unset;cursor:pointer;padding:10px 14px;border-radius:12px;
-              border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);font-weight:700;">
-              Show ${rest.length} more
-            </button>`
-            : ""
-        }
-      </div>
-    `;
-
-    const moreContainer =
-      rest.length > 0
-        ? `<div id="pw-more" style="display:none;margin-top:6px;">${restHtml}</div>`
-        : "";
-
-    const footer = `<div style="opacity:0.55;margin-top:10px;font-size:12px;">Indicators, not proof.</div>`;
-
-    setOverlay(
-      "Scan complete",
-      `${headerRow}${actions}${topHtml}${moreContainer}${footer}`
-    );
-
-    // Wire buttons after render (elements exist now)
-    const el = ensureOverlay();
-
-    const rescanBtn = el.querySelector("#pw-rescan");
-    if (rescanBtn) {
-      rescanBtn.onclick = () => scanCurrentPage(true);
-    }
-
-    const copyBtn = el.querySelector("#pw-copy");
-    if (copyBtn) {
-      copyBtn.onclick = async () => {
-        try {
-          const report = {
-            input_url: data?.input_url,
-            final_url: data?.final_url,
-            verdict: data?.verdict,
-            risk_score: data?.risk_score,
-            risk_band: data?.risk_band,
-            summary: data?.summary,
-            signals: data?.signals || [],
-          };
-          await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
-          toast("Copied.");
-        } catch (e) {
-          toast("Copy failed.");
-        }
-      };
-    }
-
-    const toggleBtn = el.querySelector("#pw-toggle");
-    const moreEl = el.querySelector("#pw-more");
-    if (toggleBtn && moreEl) {
-      toggleBtn.onclick = () => {
-        const open = moreEl.style.display !== "none";
-        moreEl.style.display = open ? "none" : "block";
-        toggleBtn.textContent = open ? `Show ${rest.length} more` : "Show less";
-      };
-    }
+    });
   }
 
-  function scanCurrentPage(force = false) {
-    const now = Date.now();
-    if (!force) {
-      // simple throttling: avoid hammering scans during rapid redirects
-      if (scanInFlight) return;
-      if (now - lastScanAt < 600) return;
+  /* =========================
+     Scan control (SPA-safe)
+     ========================= */
+
+/* =========================
+   Scan control (outbound-only)
+   ========================= */
+
+/* =========================
+   Scan control (outbound-only) + Continue anyway
+   ========================= */
+
+let lastScannedUrl = null;
+let scanInFlight = false;
+let pendingNavigationUrl = null;
+
+function setOverlayScanning(targetUrl) {
+  const el = ensureOverlay();
+  const status = el.querySelector("#phishwatch-status");
+  const detail = el.querySelector("#phishwatch-detail");
+  if (status) status.innerHTML = `<span aria-hidden="true">⏳</span><span>Scanning…</span>`;
+  if (detail) detail.textContent = targetUrl;
+}
+
+function addContinueButtonIfNeeded() {
+  const el = ensureOverlay();
+  // remove any previous button (avoid duplicates)
+  el.querySelector("#phishwatch-continue")?.remove();
+
+  if (!pendingNavigationUrl) return;
+
+  const btn = document.createElement("button");
+  btn.id = "phishwatch-continue";
+  btn.type = "button";
+  btn.textContent = "Continue anyway →";
+  btn.style.marginTop = "10px";
+  btn.style.padding = "8px 10px";
+  btn.style.borderRadius = "10px";
+  btn.style.border = "1px solid rgba(0,0,0,.14)";
+  btn.style.background = "rgba(0,0,0,.04)";
+  btn.style.fontWeight = "600";
+  btn.style.cursor = "pointer";
+
+  btn.addEventListener("click", () => {
+    const url = pendingNavigationUrl;
+    pendingNavigationUrl = null;
+    window.location.assign(url);
+  });
+
+  // append under the detail area
+  (el.querySelector("#phishwatch-detail")?.parentElement || el).appendChild(btn);
+}
+
+function runScan(reason, url) {
+  if (!url) return;
+  if (url === lastScannedUrl) return;
+  if (scanInFlight) return;
+
+  lastScannedUrl = url;
+  scanInFlight = true;
+
+  // Step 1: show overlay immediately
+  setOverlayScanning(url);
+
+  // Safety timeout (never hang forever)
+  let didRespond = false;
+  const failTimer = setTimeout(() => {
+    if (didRespond) return;
+    scanInFlight = false;
+    setOverlayError("Scan timed out (no response from background).");
+    addContinueButtonIfNeeded();
+  }, 5000);
+
+  // Step 2: send to background
+  chrome.runtime.sendMessage(
+    { type: "PHISHWATCH_SCAN", url },
+    (response) => {
+      didRespond = true;
+      clearTimeout(failTimer);
+      scanInFlight = false;
+
+      if (chrome.runtime.lastError) {
+        setOverlayError(`Background error: ${chrome.runtime.lastError.message}`);
+        addContinueButtonIfNeeded();
+        return;
+      }
+
+      // Step 3: render result
+      if (!response) {
+        setOverlayError("No response from background worker.");
+        addContinueButtonIfNeeded();
+        return;
+      }
+
+      if (response.ok && response.data) {
+        setOverlayResult(response.data);
+      } else if (response.error) {
+        setOverlayError(String(response.error));
+      } else {
+        setOverlayResult(response.data ?? response);
+      }
+
+      // always offer user a path forward after intercepting navigation
+      addContinueButtonIfNeeded();
     }
+  );
+}
 
-    scanInFlight = true;
-    lastScanAt = now;
+/* =========================
+   Outbound click interception
+   ========================= */
 
-    setOverlay("Scanning this page…", "");
+document.addEventListener(
+  "click",
+  (e) => {
+    const a = e.target?.closest?.("a[href]");
+    if (!a) return;
 
-    const url = window.location.href;
+    if (e.defaultPrevented) return;
+    if (e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (a.hasAttribute("download")) return;
 
-    // Browser-level redirect count (HTTP redirects)
-    let redirectCount = 0;
+    const href = a.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+
+    let targetUrl;
     try {
-      const nav = performance.getEntriesByType("navigation");
-      if (nav && nav[0] && typeof nav[0].redirectCount === "number") {
-        redirectCount = nav[0].redirectCount;
-      }
-    } catch (e) {
-      // ignore
+      targetUrl = new URL(href, location.href).toString();
+    } catch {
+      return;
     }
 
-    chrome.runtime.sendMessage(
-      { type: "PHISHWATCH_SCAN", url, redirect_count: redirectCount },
-      (resp) => {
-        scanInFlight = false;
+    // Only intercept outbound navigation
+    if (new URL(targetUrl).origin === location.origin) return;
 
-        const err = chrome.runtime.lastError;
-        if (err) {
-          setOverlay(
-            "PhishWatch: Scan failed",
-            `<div style="opacity:0.85;">${escapeHtml(err.message)}</div>`
-          );
-          return;
-        }
+    console.log("[PhishWatch] outbound click → scanning", targetUrl);
 
-        if (!resp?.ok) {
-          setOverlay(
-            "PhishWatch: Scan failed",
-            `<div style="opacity:0.85;">${escapeHtml(
-              resp?.error || "Unknown error"
-            )}</div>`
-          );
-          return;
-        }
+    e.preventDefault();
+    e.stopPropagation();
 
-        renderResult(resp.data);
-      }
-    );
-  }
+    pendingNavigationUrl = targetUrl;
+    runScan("outbound_click", targetUrl);
+  },
+  true
+);
 
-  // --- Redirect / navigation watcher ---
-  // This solves: scan fires on a shortener page, then the page redirects and you never re-scan.
-  setInterval(() => {
-    const href = window.location.href;
-    if (href !== lastHref) {
-      lastHref = href;
-      scanCurrentPage(true);
-    }
-  }, 750);
-
-  // Initial scan
-  scanCurrentPage(true);
 })();
