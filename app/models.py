@@ -1,6 +1,6 @@
 # app/models.py
 from __future__ import annotations
-
+from typing import Optional
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
@@ -49,6 +49,7 @@ class SignalFinding(BaseModel):
 
 class CheckRequest(BaseModel):
     url: str
+    redirect_count: int = 0
 
 
 class ScanResult(BaseModel):
@@ -56,6 +57,8 @@ class ScanResult(BaseModel):
     Canonical result returned by /api/check.
     This is the backbone contract for backend, extension, and UI.
     """
+    summary: Optional[str] = None
+    risk_band: Optional[str] = None
     input_url: str
     final_url: str
     redirect_chain: List[str] = Field(default_factory=list)

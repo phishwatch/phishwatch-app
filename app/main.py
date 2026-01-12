@@ -45,6 +45,7 @@ def root():
 
 class CheckRequest(BaseModel):
     url: str
+    redirect_count: int = 0
 
 
 def risk_band_from_score(score: int) -> str:
@@ -78,6 +79,20 @@ def check_url(payload: CheckRequest) -> ScanResult:
 
     # 3) Indicators → explainable signals
     signals = indicators_to_signals(indicators)
+    # Browser-observed redirects (runtime signal)
+    if payload.redirect_count >= 1:
+        signals.append(
+            SignalFinding(
+                id="multi_redirect",
+                severity="medium",
+                explanation=(
+                    f"This page performed {payload.redirect_count} redirect(s) "
+                    "before loading, which can hide the true destination."
+                ),
+                evidence={"redirect_count": payload.redirect_count},
+        )
+    )
+
 
     # 3b) Obfuscation: multiple redirects
     if len(resolved.redirect_chain) >= 3:

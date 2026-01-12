@@ -1,328 +1,295 @@
-// PhishWatch MV3 — content.js
-// Minimal, robust content script that:
-// 1) Always shows a visible "Scanning…" overlay on non-trusted pages
-// 2) Sends the current URL to the background service worker
-// 3) Renders a simple result when a response arrives
-// 4) Avoids SPA + Gmail noise (no repeated rescans, hard-skip Gmail)
-
-/* =========================
-   Config / guards
-   ========================= */
+console.log("[PhishWatch] CONTENT VERSION: RESET-2026-01-12-C");
 
 (() => {
   "use strict";
 
-  // --- "Trusted app" / noisy surfaces to SKIP entirely ---
-  // Even though Gmail may be part of your wider idea, for this MVP we skip it
-  // to avoid constant SPA route updates + DOM churn.
-  const SKIP_HOSTS = new Set([
-    "mail.google.com",
-    "inbox.google.com",
-    "calendar.google.com",
-    "docs.google.com",
-    "drive.google.com",
-  ]);
-
-  // Don’t run in iframes (prevents multiple overlays on embedded content).
-  if (window.top !== window) return;
-
-  const host = location.hostname;
-
-// Skip Gmail + Google apps
-if (SKIP_HOSTS.has(host)) return;
-
-// Skip only the PhishWatch API/docs (keeps other localhost pages testable)
-if ((host === "127.0.0.1" || host === "localhost") && (
-  location.pathname.startsWith("/docs") ||
-  location.pathname.startsWith("/openapi.json") ||
-  location.pathname.startsWith("/redoc") ||
-  location.pathname.startsWith("/health") ||
-  location.pathname.startsWith("/api/")
-)) {
-  return;
-}
-console.log("[PhishWatch] content.js loaded on", location.href);
-document.documentElement.setAttribute("data-phishwatch-loaded", "1");
-
-  // Some special Chrome pages are not inject-able anyway; this keeps logs clean.
-  if (!location.href.startsWith("http://") && !location.href.startsWith("https://")) return;
-
-  /* =========================
-     Overlay (UI)
-     ========================= */
+  const DEBUG = true;
+  const pwLog = (...args) => DEBUG && console.log("[PhishWatch]", ...args);
 
   const OVERLAY_ID = "phishwatch-overlay";
-  let overlayEl = null;
+  const ALLOW_ACTION_TYPE = "PHISHWATCH_SESSION_RPC";
+  const SCAN_TYPE = "PHISHWATCH_SCAN";
 
+  let overlayEl = null;
+  let pendingUrl = null;
+  let scanInFlight = false;
+  let scanSeq = 0; // token to invalidate old timers/callbacks
+
+  // Fix BFCache “back button weirdness”
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      pwLog("BFCache restore -> reset transient state");
+      pendingUrl = null;
+      scanInFlight = false;
+      cleanupOverlay();
+      scanSeq++;
+    }
+  });
+
+  // ---------- RPC helper ----------
+  function pwSessionRpc(action, payload) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { type: ALLOW_ACTION_TYPE, action, payload },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({ ok: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          resolve(response);
+        }
+      );
+    });
+  }
+
+  async function isAllowlisted(url) {
+    const resp = await pwSessionRpc("allowlist.has", { url });
+    pwLog("allowlist.has ->", resp);
+    return !!(resp?.ok && resp.data?.allowed);
+  }
+
+  // ---------- Overlay ----------
   function ensureOverlay() {
     if (overlayEl && document.contains(overlayEl)) return overlayEl;
 
     overlayEl = document.createElement("div");
     overlayEl.id = OVERLAY_ID;
 
-    // Keep it simple + highly visible.
     overlayEl.style.position = "fixed";
     overlayEl.style.top = "16px";
     overlayEl.style.right = "16px";
     overlayEl.style.zIndex = "2147483647";
-    overlayEl.style.maxWidth = "360px";
+    overlayEl.style.maxWidth = "380px";
     overlayEl.style.padding = "12px 14px";
     overlayEl.style.borderRadius = "12px";
     overlayEl.style.boxShadow = "0 8px 24px rgba(0,0,0,.18)";
-    overlayEl.style.fontFamily = "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    overlayEl.style.fontFamily =
+      "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
     overlayEl.style.fontSize = "13px";
     overlayEl.style.lineHeight = "1.35";
     overlayEl.style.color = "#111";
     overlayEl.style.background = "rgba(255,255,255,.96)";
     overlayEl.style.border = "1px solid rgba(0,0,0,.10)";
     overlayEl.style.backdropFilter = "blur(6px)";
-    overlayEl.style.pointerEvents = "auto"; // allow copy/select if you want later
+    overlayEl.style.pointerEvents = "auto";
 
-    // Initial state
     overlayEl.innerHTML = `
-      <div style="font-weight:700; margin-bottom:4px;">PhishWatch</div>
-      <div id="phishwatch-status" style="display:flex; gap:8px; align-items:center;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div style="font-weight:700;">PhishWatch</div>
+        <button id="pw-close" type="button" style="border:0;background:transparent;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+      <div id="pw-status" style="display:flex; gap:8px; align-items:center; margin-top:6px;">
         <span aria-hidden="true">⏳</span>
         <span>Scanning…</span>
       </div>
-      <div id="phishwatch-detail" style="margin-top:8px; color:#333; opacity:.9;">
-        ${escapeHtml(location.href)}
+      <div id="pw-detail" style="margin-top:8px; color:#333; opacity:.9;"></div>
+      <div id="pw-actions" style="margin-top:10px; display:none; gap:8px; justify-content:flex-end;">
+        <button id="pw-cancel" type="button" style="padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid rgba(0,0,0,.14);background:rgba(0,0,0,.03);font-weight:600;">Cancel</button>
+        <button id="pw-continue" type="button" style="padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid rgba(0,0,0,.14);background:rgba(0,0,0,.08);font-weight:700;">Continue anyway</button>
       </div>
     `;
 
-    // Append ASAP (even before DOMContentLoaded if possible).
-    // If body isn't available yet, fall back to documentElement.
-    const mount = document.body || document.documentElement;
-    mount.appendChild(overlayEl);
+    overlayEl.addEventListener("click", (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
 
+      if (t.id === "pw-close" || t.id === "pw-cancel") {
+        cleanupOverlay();
+        pendingUrl = null;
+        scanInFlight = false;
+        scanSeq++; // invalidate any pending timers/callbacks
+        return;
+      }
+
+      if (t.id === "pw-continue") {
+        e.preventDefault();
+        e.stopPropagation();
+        continueAnyway();
+      }
+    });
+
+    (document.body || document.documentElement).appendChild(overlayEl);
     return overlayEl;
   }
 
-  function setOverlayScanning(targetUrl) {
-    const el = ensureOverlay();
-    const status = el.querySelector("#phishwatch-status");
-    const detail = el.querySelector("#phishwatch-detail");
-    if (status) status.innerHTML = `<span aria-hidden="true">⏳</span><span>Scanning…</span>`;
-    if (detail) detail.textContent = url;
+  function cleanupOverlay() {
+    const el = document.getElementById(OVERLAY_ID);
+    if (el) el.remove();
+    overlayEl = null;
   }
 
-  function setOverlayResult(result) {
+  function setOverlayScanning(url) {
     const el = ensureOverlay();
-    const status = el.querySelector("#phishwatch-status");
-    const detail = el.querySelector("#phishwatch-detail");
+    el.querySelector("#pw-status").innerHTML =
+      `<span aria-hidden="true">⏳</span><span>Scanning…</span>`;
+    el.querySelector("#pw-detail").textContent = url;
+    el.querySelector("#pw-actions").style.display = "none";
+  }
 
-    // You said your API returns ScanResult; keep this tolerant to different shapes.
-    // Prefer these if present: verdict, risk_band, score, summary.
-    const verdict = String(result?.risk_band ?? result?.verdict ?? "unknown").toUpperCase();
-    const score = typeof result?.score === "number" ? result.score : null;
-    const summary = result?.summary ?? null;
-
-    const badge = formatVerdictBadge(verdict);
-    const scoreLine = score !== null ? `Score: <b>${score}</b>` : "";
-    const summaryLine = summary ? `<div style="margin-top:6px;">${escapeHtml(String(summary))}</div>` : "";
-
-  if (status) {
-    const isRisky =
-    verdict === "HIGH" ||
-    verdict === "MALICIOUS";
-
-  const icon = isRisky ? "⚠️" : "✅";
-
-  status.innerHTML = `
-    <span aria-hidden="true">${icon}</span>
-    <span>${badge}</span>
-  `;
-}
-
-    if (detail) {
-      detail.innerHTML = `
-        <div style="color:#333; opacity:.95;">
-          ${scoreLine}
-          ${summaryLine}
-        </div>
-      `;
-    }
+  function setOverlayStillScanning() {
+    const el = ensureOverlay();
+    el.querySelector("#pw-status").innerHTML =
+      `<span aria-hidden="true">⏳</span><span>Still scanning…</span>`;
   }
 
   function setOverlayError(message) {
     const el = ensureOverlay();
-    const status = el.querySelector("#phishwatch-status");
-    const detail = el.querySelector("#phishwatch-detail");
-    if (status) status.innerHTML = `<span aria-hidden="true">⚠️</span><span><b>Error</b></span>`;
-    if (detail) detail.textContent = message;
+    el.querySelector("#pw-status").innerHTML =
+      `<span aria-hidden="true">❌</span><span>Error</span>`;
+    el.querySelector("#pw-detail").textContent = String(message || "Unknown error");
+    el.querySelector("#pw-actions").style.display = "flex";
   }
 
-  function formatVerdictBadge(v) {
-    const text = String(v);
-    // Tiny, neutral badge. (No CSS files, no refactors.)
-    return `<span style="
-      display:inline-block;
-      padding:2px 8px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.12);
-      background:rgba(0,0,0,.04);
-      font-weight:600;
-    ">${escapeHtml(text)}</span>`;
+  function setOverlayResult(result) {
+    const verdict = String(result?.risk_band ?? "unknown").toUpperCase();
+    const summary = result?.summary ? String(result.summary) : "";
+    const isRisky = verdict === "HIGH" || verdict === "MEDIUM" || verdict === "MALICIOUS";
+
+    const el = ensureOverlay();
+    el.querySelector("#pw-status").innerHTML =
+      `<span aria-hidden="true">${isRisky ? "⚠️" : "✅"}</span><span>${verdict}</span>`;
+    el.querySelector("#pw-detail").textContent =
+      summary || (isRisky ? "Risk detected." : "Looks safe.");
+
+    // Not risky -> auto continue
+    if (!isRisky && pendingUrl) {
+      const go = pendingUrl;
+      pendingUrl = null;
+      cleanupOverlay();
+      scanInFlight = false;
+      window.location.assign(go);
+      return;
+    }
+
+    // Risky -> show actions
+    el.querySelector("#pw-actions").style.display = pendingUrl ? "flex" : "none";
   }
 
-  function escapeHtml(str) {
-    return String(str).replace(/[&<>"']/g, (m) => {
-      switch (m) {
-        case "&": return "&amp;";
-        case "<": return "&lt;";
-        case ">": return "&gt;";
-        case '"': return "&quot;";
-        case "'": return "&#039;";
-        default: return m;
-      }
-    });
-  }
+  // ---------- Continue anyway ----------
+  async function continueAnyway() {
+    pwLog("continueAnyway", { pendingUrl, scanInFlight });
+    if (!pendingUrl) return;
 
-  /* =========================
-     Scan control (SPA-safe)
-     ========================= */
+    const target = pendingUrl;
 
-/* =========================
-   Scan control (outbound-only)
-   ========================= */
+    const ok = await pwSessionRpc("allowlist.add", { url: target, reason: "user_bypass" });
+    pwLog("allowlist.add result", { target, ok });
 
-/* =========================
-   Scan control (outbound-only) + Continue anyway
-   ========================= */
-
-let lastScannedUrl = null;
-let scanInFlight = false;
-let pendingNavigationUrl = null;
-
-function setOverlayScanning(targetUrl) {
-  const el = ensureOverlay();
-  const status = el.querySelector("#phishwatch-status");
-  const detail = el.querySelector("#phishwatch-detail");
-  if (status) status.innerHTML = `<span aria-hidden="true">⏳</span><span>Scanning…</span>`;
-  if (detail) detail.textContent = targetUrl;
-}
-
-function addContinueButtonIfNeeded() {
-  const el = ensureOverlay();
-  // remove any previous button (avoid duplicates)
-  el.querySelector("#phishwatch-continue")?.remove();
-
-  if (!pendingNavigationUrl) return;
-
-  const btn = document.createElement("button");
-  btn.id = "phishwatch-continue";
-  btn.type = "button";
-  btn.textContent = "Continue anyway →";
-  btn.style.marginTop = "10px";
-  btn.style.padding = "8px 10px";
-  btn.style.borderRadius = "10px";
-  btn.style.border = "1px solid rgba(0,0,0,.14)";
-  btn.style.background = "rgba(0,0,0,.04)";
-  btn.style.fontWeight = "600";
-  btn.style.cursor = "pointer";
-
-  btn.addEventListener("click", () => {
-    const url = pendingNavigationUrl;
-    pendingNavigationUrl = null;
-    window.location.assign(url);
-  });
-
-  // append under the detail area
-  (el.querySelector("#phishwatch-detail")?.parentElement || el).appendChild(btn);
-}
-
-function runScan(reason, url) {
-  if (!url) return;
-  if (url === lastScannedUrl) return;
-  if (scanInFlight) return;
-
-  lastScannedUrl = url;
-  scanInFlight = true;
-
-  // Step 1: show overlay immediately
-  setOverlayScanning(url);
-
-  // Safety timeout (never hang forever)
-  let didRespond = false;
-  const failTimer = setTimeout(() => {
-    if (didRespond) return;
+    pendingUrl = null;
+    cleanupOverlay();
     scanInFlight = false;
-    setOverlayError("Scan timed out (no response from background).");
-    addContinueButtonIfNeeded();
-  }, 5000);
+    window.location.assign(target);
+  }
 
-  // Step 2: send to background
-  chrome.runtime.sendMessage(
-    { type: "PHISHWATCH_SCAN", url },
-    (response) => {
-      didRespond = true;
-      clearTimeout(failTimer);
+  // ---------- Scan flow ----------
+  async function runScan(url) {
+    if (!url) return;
+    if (scanInFlight) return;
+
+    // Lock immediately to prevent double-click races during allowlist check
+    scanInFlight = true;
+    pendingUrl = url;
+    const mySeq = ++scanSeq;
+
+    // IMPORTANT: allowlist short-circuit BEFORE showing overlay (prevents flash + auto-nav)
+    if (await isAllowlisted(url)) {
+      pwLog("allowlisted -> navigating (no overlay)", url);
+      pendingUrl = null;
+      scanInFlight = false;
+      cleanupOverlay();
+      window.location.assign(url);
+      return;
+    }
+
+    setOverlayScanning(url);
+
+    // Two-stage timeout: no “error flash”
+    const tStill = setTimeout(() => {
+      if (scanInFlight && pendingUrl === url && scanSeq === mySeq) {
+        setOverlayStillScanning();
+      }
+    }, 2500);
+
+    const tHard = setTimeout(() => {
+      if (scanInFlight && pendingUrl === url && scanSeq === mySeq) {
+        setOverlayError("No response from background worker. Reload extension & try again.");
+        scanInFlight = false;
+      }
+    }, 10000);
+
+    chrome.runtime.sendMessage({ type: SCAN_TYPE, url }, (response) => {
+      clearTimeout(tStill);
+      clearTimeout(tHard);
+
+      // Ignore late responses from a previous scan attempt
+      if (scanSeq !== mySeq) return;
+
       scanInFlight = false;
 
       if (chrome.runtime.lastError) {
         setOverlayError(`Background error: ${chrome.runtime.lastError.message}`);
-        addContinueButtonIfNeeded();
         return;
       }
-
-      // Step 3: render result
       if (!response) {
         setOverlayError("No response from background worker.");
-        addContinueButtonIfNeeded();
         return;
       }
 
-      if (response.ok && response.data) {
-        setOverlayResult(response.data);
-      } else if (response.error) {
-        setOverlayError(String(response.error));
-      } else {
-        setOverlayResult(response.data ?? response);
+      if (response.ok && response.data) setOverlayResult(response.data);
+      else if (response.error) setOverlayError(String(response.error));
+      else setOverlayResult(response.data ?? response);
+    });
+  }
+
+  // ---------- Outbound click interception ----------
+  function isOutboundNavigation(targetUrl) {
+    try {
+      const u = new URL(targetUrl, location.href);
+      return u.origin !== location.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  function findAnchor(t) {
+    return t && t.closest ? t.closest("a[href]") : null;
+  }
+
+  function shouldIgnoreClick(e, a) {
+    if (e.defaultPrevented) return true;
+    if (e.button !== 0) return true;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return true;
+    if (!a) return true;
+    const href = a.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return true;
+    if (a.hasAttribute("download")) return true;
+    return false;
+  }
+
+  document.addEventListener(
+    "click",
+    (e) => {
+      const a = findAnchor(e.target);
+      if (shouldIgnoreClick(e, a)) return;
+
+      const href = a.getAttribute("href");
+      let targetUrl;
+      try {
+        targetUrl = new URL(href, location.href).toString();
+      } catch {
+        return;
       }
 
-      // always offer user a path forward after intercepting navigation
-      addContinueButtonIfNeeded();
-    }
+      if (!isOutboundNavigation(targetUrl)) return;
+
+      pwLog("OUTBOUND intercept", { targetUrl });
+      e.preventDefault();
+      e.stopPropagation();
+
+      runScan(targetUrl);
+    },
+    true
   );
-}
 
-/* =========================
-   Outbound click interception
-   ========================= */
-
-document.addEventListener(
-  "click",
-  (e) => {
-    const a = e.target?.closest?.("a[href]");
-    if (!a) return;
-
-    if (e.defaultPrevented) return;
-    if (e.button !== 0) return;
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    if (a.hasAttribute("download")) return;
-
-    const href = a.getAttribute("href");
-    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
-
-    let targetUrl;
-    try {
-      targetUrl = new URL(href, location.href).toString();
-    } catch {
-      return;
-    }
-
-    // Only intercept outbound navigation
-    if (new URL(targetUrl).origin === location.origin) return;
-
-    console.log("[PhishWatch] outbound click → scanning", targetUrl);
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    pendingNavigationUrl = targetUrl;
-    runScan("outbound_click", targetUrl);
-  },
-  true
-);
-
+  console.log("[PhishWatch] content.js loaded on", location.href);
 })();
