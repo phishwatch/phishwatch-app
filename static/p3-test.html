@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PhishWatch Phase-3 Net Treadmill Test</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; }
+      .box { max-width: 720px; padding: 16px; border: 1px solid #ddd; border-radius: 12px; }
+      label { display:block; margin-top: 12px; }
+      input { width: 100%; padding: 10px; font-size: 16px; box-sizing: border-box; }
+      button { margin-top: 16px; padding: 10px 14px; font-size: 16px; cursor: pointer; }
+      code { background: #f6f6f6; padding: 2px 6px; border-radius: 6px; }
+      .hint { margin-top: 12px; color: #444; line-height: 1.4; }
+      .log { margin-top: 12px; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:#fafafa; padding: 10px; border-radius: 12px; border: 1px solid #eee; min-height: 80px; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h2>PhishWatch Phase-3 (Net Treadmill) Test Page</h2>
+      <p>
+        Goal: generate a <code>cross-origin POST</code> shortly after password focus to trigger
+        <code>unexpected_cross_origin_post_during_auth</code>.
+      </p>
+
+      <label>Email</label>
+      <input id="email" type="email" placeholder="user@example.com" />
+
+      <label>Password</label>
+      <input id="pw" type="password" placeholder="password" />
+
+      <button id="fire">Fire cross-origin POST now</button>
+
+      <div class="hint">
+        Steps:<br/>
+        1) Click into the password field.<br/>
+        2) Within ~1.5s, click the button.<br/>
+        Expected: PhishWatch should produce the Phase-3 signal and the pill should go <b>MEDIUM</b>.
+      </div>
+
+      <div class="log" id="log"></div>
+      <div style="margin-top:12px;">
+      <a href="https://bit.ly/3" id="pw-testlink">Test shortener link</a>
+      </div>
+
+    <script>
+      const logEl = document.getElementById("log");
+      const log = (...args) => {
+        const line = args.map(a => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+        logEl.textContent += line + "\n";
+      };
+
+      const TARGET = "https://postman-echo.com/post";
+
+      document.getElementById("pw").addEventListener("focus", () => {
+        log("[test] password focus at", Date.now());
+      });
+
+      document.getElementById("fire").addEventListener("click", async () => {
+        const started = Date.now();
+        log("[test] firing cross-origin POST at", started, "to", TARGET);
+
+        try {
+          const res = await fetch(TARGET, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ts: started, note: "pw p3 test" }),
+          });
+          log("[test] fetch completed:", { ok: res.ok, status: res.status });
+        } catch (e) {
+          log("[test] fetch error (ok for test):", String(e));
+        }
+      });
+
+    </script>
+  </body>
+</html>

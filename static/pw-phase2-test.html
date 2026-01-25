@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PW Phase2 Test</title>
+  </head>
+  <body>
+    <h1>PW Phase2 Test</h1>
+    <p>Password form submits to a different origin (httpbin).</p>
+
+    <form action="https://httpbin.org/post" method="post">
+      <input type="text" name="u" placeholder="user" /><br />
+      <input type="password" name="p" placeholder="pass" /><br />
+      <button type="submit">Submit</button>
+    </form>
+
+    <p style="margin-top:16px">
+      <a id="out" href="https://example.org/">Outbound link</a>
+    </p>
+  </body>
+</html>
+

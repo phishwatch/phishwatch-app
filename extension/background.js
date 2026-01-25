@@ -1,134 +1,123 @@
-// background.js (MV3 service worker, ES module-safe)
-// - Handles scanning via API (avoids CORS)
-// - Handles session allowlist RPC via chrome.storage.session
+console.log("[PhishWatch] BACKGROUND VERSION: 2026-01-19-FAILFAST-FETCHTIMEOUT+CTX");
 
-console.log("✅ PhishWatch background service worker loaded (module)");
+const API_BASE = "http://127.0.0.1:8080";
+const API_TIMEOUT_MS = 4000;
 
-const PW_TEST = "medium"; // "low" | "medium" | "high" | "" (off)
-const BASE_API = "http://127.0.0.1:8080/api/check";
-const API_URL = BASE_API + (PW_TEST ? `?pw_test=${PW_TEST}` : "");
+function jsonOk(data) {
+  return { ok: true, data };
+}
+function jsonErr(error) {
+  return { ok: false, error: String(error?.message || error) };
+}
 
-const ALLOWLIST_KEY = "allowlist"; // chrome.storage.session key
-const FETCH_TIMEOUT_MS = 3500;
+async function apiCheck(url, context) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("✅ PhishWatch installed / updated");
-});
+  try {
+    const payload = { url };
+    if (context && typeof context === "object") payload.context = context;
 
-chrome.runtime.onStartup.addListener(() => {
-  console.log("✅ PhishWatch onStartup");
-});
+    const started = Date.now();
+
+    const r = await fetch(`${API_BASE}/api/check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const ms = Date.now() - started;
+
+    if (!r.ok) {
+      const txt = await r.text().catch(() => "");
+      throw new Error(`API ${r.status} in ${ms}ms: ${txt || "request failed"}`);
+    }
+
+    const data = await r.json();
+    return data;
+  } catch (e) {
+    if (String(e?.name) === "AbortError") {
+      throw new Error(`API timeout after ${API_TIMEOUT_MS}ms`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// --- session allowlist helpers (chrome.storage.session) ---
+async function getAllowlist() {
+  const out = await chrome.storage.session.get(["allowlist"]);
+  return Array.isArray(out.allowlist) ? out.allowlist : [];
+}
+async function setAllowlist(list) {
+  await chrome.storage.session.set({ allowlist: list });
+}
+async function allowlistHas(url) {
+  const list = await getAllowlist();
+  return list.includes(url);
+}
+async function allowlistAdd(url) {
+  const list = await getAllowlist();
+  if (!list.includes(url)) {
+    list.push(url);
+    await setAllowlist(list);
+  }
+  return true;
+}
+async function allowlistClear() {
+  await setAllowlist([]);
+  return true;
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (!msg?.type) return;
+  (async () => {
+    try {
+    // --- session RPC ---
+if (msg?.type === "PHISHWATCH_SESSION_RPC") {
+  const { action, payload } = msg;
 
-  // ===============================
-  // 1) Session allowlist RPC
-  // ===============================
-  if (msg.type === "PHISHWATCH_SESSION_RPC") {
-    (async () => {
-      try {
-        const { action, payload } = msg;
+  if (action === "allowlist.has") {
+    const allowed = await allowlistHas(payload?.url);
+    return sendResponse({ ok: true, allowed });
+  }
 
-        if (action === "allowlist.add") {
-  const url = payload?.url;
-  if (!url) return sendResponse({ ok: false, error: "missing url" });
+  if (action === "allowlist.add") {
+    const ok = await allowlistAdd(payload?.url);
+    return sendResponse({ ok: true, ok });
+  }
 
-  const existing =
-    (await chrome.storage.session.get(ALLOWLIST_KEY))[ALLOWLIST_KEY] || [];
+  if (action === "allowlist.clear") {
+    const ok = await allowlistClear();
+    return sendResponse({ ok: true, ok });
+  }
 
-  if (!existing.includes(url)) existing.push(url);
-
-  // NEW: store metadata about why it was allowlisted
-  const META_KEY = "allowlist_meta";
-  const meta =
-    (await chrome.storage.session.get(META_KEY))[META_KEY] || {};
-
-  meta[url] = {
-    ts: Date.now(),
-    reason: payload?.reason || "unknown",
-  };
-
-  await chrome.storage.session.set({
-    [ALLOWLIST_KEY]: existing,
-    [META_KEY]: meta,
-  });
-
-  return sendResponse({ ok: true, data: { size: existing.length } });
+  return sendResponse({ ok: false, error: `unknown action: ${action}` });
 }
 
 
-        if (action === "allowlist.has") {
-          const url = payload?.url;
-          if (!url) return sendResponse({ ok: false, error: "missing url" });
 
-          const list =
-            (await chrome.storage.session.get(ALLOWLIST_KEY))[ALLOWLIST_KEY] || [];
-
-          return sendResponse({ ok: true, data: { allowed: list.includes(url) } });
-        }
-
-        if (action === "allowlist.clear") {
-          await chrome.storage.session.set({ [ALLOWLIST_KEY]: [] });
-          return sendResponse({ ok: true });
-        }
-
-        return sendResponse({ ok: false, error: `unknown action: ${action}` });
-      } catch (e) {
-        return sendResponse({ ok: false, error: String(e?.message || e) });
-      }
-    })();
-
-    return true; // MV3 async response
-  }
-
-  // ===============================
-  // 2) Scan handler
-  // ===============================
-  if (msg.type === "PHISHWATCH_SCAN") {
-    (async () => {
-      try {
+      // --- scan ---
+      if (msg?.type === "PHISHWATCH_SCAN") {
         const url = msg?.url;
-        if (!url) return sendResponse({ ok: false, error: "missing url" });
+        const context = msg?.context;
 
-        console.log("[PhishWatch BG] scan request:", { url, API_URL });
+        if (!url) return sendResponse(jsonErr("missing url"));
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        // Helpful during testing; safe to keep for now
+        // console.log("[PhishWatch] scan request", { url, context });
 
-        const res = await fetch(API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-          },
-          body: JSON.stringify({
-            url,
-            redirect_count: msg.redirect_count ?? 0,
-          }),
-          signal: controller.signal,
-        }).finally(() => clearTimeout(timeout));
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          return sendResponse({
-            ok: false,
-            error: `API ${res.status}: ${text || "No body"}`,
-          });
-        }
-
-        const data = await res.json();
-        return sendResponse({ ok: true, data });
-      } catch (err) {
-        const msg = err?.name === "AbortError"
-          ? `API timeout after ${FETCH_TIMEOUT_MS}ms`
-          : String(err?.message || err);
-        return sendResponse({ ok: false, error: msg });
+        const data = await apiCheck(url, context);
+        return sendResponse(jsonOk(data));
       }
-    })();
 
-    return true; // MV3 async response
-  }
+      return sendResponse(jsonErr("unknown message type"));
+    } catch (e) {
+      // Always respond—never hang the content script
+      return sendResponse(jsonErr(e));
+    }
+  })();
 
-  // ignore anything else
+  return true; // required for async sendResponse
 });

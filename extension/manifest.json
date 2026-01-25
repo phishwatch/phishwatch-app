@@ -4,9 +4,7 @@
   "version": "0.1.0",
   "description": "Runtime phishing signals + explainable overlay.",
 
-  "permissions": [
-    "scripting", "storage"
-  ],
+  "permissions": ["scripting", "storage"],
 
   "host_permissions": [
     "http://127.0.0.1:8080/*",
@@ -25,6 +23,13 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["pw-net-hook.js"],
+      "matches": ["http://*/*", "https://*/*"]
     }
   ]
 }

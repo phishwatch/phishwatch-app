@@ -46,13 +46,18 @@ def resolve_url(url: str, timeout: float = 6.0) -> ResolveResult:
     chain: List[str] = [normalized_input]
 
     try:
-        # Some shorteners behave better with a browser-ish UA
         headers = {"User-Agent": "Mozilla/5.0 (PhishWatch Resolver)"}
+
+        limits = httpx.Limits(
+            max_connections=5,
+            max_keepalive_connections=2,
+        )
 
         with httpx.Client(
             follow_redirects=True,
             timeout=timeout,
             headers=headers,
+            limits=limits,
         ) as client:
             resp = client.get(normalized_input)
 
@@ -62,7 +67,7 @@ def resolve_url(url: str, timeout: float = 6.0) -> ResolveResult:
             # Build redirect chain (best-effort)
             try:
                 for h in resp.history:
-                    u = str(h.url)
+                    u = normalize_url(str(h.url))
                     if u not in chain:
                         chain.append(u)
             except Exception:
@@ -77,19 +82,18 @@ def resolve_url(url: str, timeout: float = 6.0) -> ResolveResult:
                 final_url=final_url,
                 normalized_final_url=normalized_final,
                 redirect_chain=chain,
-                resolved=(final_url != normalized_input),
+                resolved=(normalized_final != normalized_input),
                 input_is_shortener=input_is_shortener,
                 error=None,
             )
 
     except Exception as e:
-        # Fallback: treat as unresolved, analyze the input itself
         return ResolveResult(
             input_url=url,
             normalized_input_url=normalized_input,
             final_url=normalized_input,
             normalized_final_url=normalized_input,
-            redirect_chain=chain,
+            redirect_chain=[normalized_input],
             resolved=False,
             input_is_shortener=input_is_shortener,
             error=f"{type(e).__name__}: {e}",

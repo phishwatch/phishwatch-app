@@ -1,0 +1,815 @@
+console.log("[PhishWatch] CONTENT VERSION: 2026-01-20-PHASE2FLAG+CRED_FORM_CROSS_ORIGIN (default OFF)");
+
+(() => {
+  "use strict";
+
+  const DEBUG = true;
+  const pwLog = (...args) => DEBUG && console.log("[PhishWatch]", ...args);
+
+  const OVERLAY_ID = "phishwatch-overlay";
+  const ALLOW_ACTION_TYPE = "PHISHWATCH_SESSION_RPC";
+  const SCAN_TYPE = "PHISHWATCH_SCAN";
+
+  // ---------------- Phase-2 Step-1 flag ----------------
+  // When true: detect "credential form submits cross-origin" and add a medium signal.
+  // Default OFF so Phase-1 behavior is unchanged unless explicitly enabled.
+  const PW_ENABLE_PHASE2_CRED_FORM = true;
+
+  // Tunables
+  const RPC_TIMEOUT_MS = 1200;
+  const SCAN_TIMEOUT_MS = 4500;
+  const STILL_SCANNING_AT_MS = 1800;
+
+  let overlayEl = null;
+  let pendingUrl = null;
+  let scanInFlight = false;
+  let scanSeq = 0;
+
+  // If background dies (extension disabled, SW suspended, etc.), fail-open and stop intercepting.
+  let interceptionEnabled = true;
+
+  // ---- Silent allowlist (non-intrusive principle) ----
+  // If destination host matches these, we do not intercept at all.
+  const SILENT_ALLOW_SUFFIXES = [
+    ".google.com",
+    ".googleusercontent.com",
+    ".gstatic.com",
+    ".googleapis.com",
+    ".googleadservices.com",
+    ".doubleclick.net",
+    ".googlesyndication.com",
+    ".youtube.com",
+    ".ytimg.com",
+    ".drive.google.com",
+    ".docs.google.com",
+  ];
+
+  // ---- Pre-scan gate thresholds ----
+  // Keep conservative: reduce noise, not catch everything.
+  const PRESCAN_LONG_URL = 220;
+  const PRESCAN_LONG_QUERY = 120;
+
+  // ---------- Utils ----------
+  function hostFromUrl(u) {
+    try {
+      return (new URL(u, location.href).hostname || "").toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+
+  function isSilentlyAllowedTarget(targetUrl) {
+    const h = hostFromUrl(targetUrl);
+    if (!h) return false;
+
+    for (const suf of SILENT_ALLOW_SUFFIXES) {
+      const s = suf.toLowerCase();
+      if (h === s.slice(1)) return true; // allow "google.com" for ".google.com"
+      if (h.endsWith(s)) return true;
+    }
+    return false;
+  }
+
+  function looksLikeIpLiteral(host) {
+    // IPv4
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
+    // Bracketed IPv6
+    if (/^\[[0-9a-f:]+\]$/i.test(host)) return true;
+    return false;
+  }
+
+  function hasPunycode(host) {
+    return host.includes("xn--");
+  }
+
+  function hasShortenerLikeHost(host) {
+    const known = new Set([
+      "bit.ly",
+      "t.co",
+      "tinyurl.com",
+      "goo.gl",
+      "ow.ly",
+      "buff.ly",
+      "is.gd",
+      "rebrand.ly",
+      "cutt.ly",
+      "rb.gy",
+      "lnkd.in",
+      "s.id",
+    ]);
+    return known.has(host);
+  }
+
+  function prescanHints(targetUrl, ctx) {
+    // Returns { shouldScan: boolean, reasons: string[] }
+    const reasons = [];
+
+    let u;
+    try {
+      u = new URL(targetUrl, location.href);
+    } catch {
+      return { shouldScan: false, reasons: ["unparseable_url"] };
+    }
+
+    const host = (u.hostname || "").toLowerCase();
+    const path = u.pathname || "";
+    const qs = u.search || "";
+    const full = u.toString();
+
+    // 1) Obvious risky patterns
+    if (looksLikeIpLiteral(host)) reasons.push("ip_literal");
+    if (hasPunycode(host)) reasons.push("punycode");
+    if (hasShortenerLikeHost(host)) reasons.push("url_shortener_host");
+
+    // 2) Suspicious URL structure / obfuscation
+    if (full.length >= PRESCAN_LONG_URL) reasons.push("very_long_url");
+    if (qs.length >= PRESCAN_LONG_QUERY) reasons.push("long_query");
+    if ((full.match(/%[0-9a-f]{2}/gi) || []).length >= 10) reasons.push("heavy_url_encoding");
+    if ((full.match(/@/g) || []).length >= 1) reasons.push("at_symbol");
+    if ((path.match(/\/\//g) || []).length >= 1) reasons.push("double_slash_in_path");
+
+    // 3) Auth-ish path hints (cheap; not a verdict)
+    if (/(login|signin|account|verify|password|secure|update|billing)/i.test(full)) {
+      reasons.push("auth_keywords");
+    }
+
+    // 4) (Phase-2) leaving a credential surface (hint only; does NOT itself add a signal)
+    if (ctx?.credential_surface && !isSilentlyAllowedTarget(full)) {
+      reasons.push("leaving_credential_surface");
+    }
+
+    return { shouldScan: reasons.length > 0, reasons };
+  }
+
+  function normalizeForAllowlist(u) {
+    try {
+      const x = new URL(u, location.href);
+      x.hash = "";
+      x.pathname = x.pathname.replace(/\/+$/, "") || "/";
+      return x.toString();
+    } catch {
+      return u;
+    }
+  }
+
+  // ---------- Runtime / messaging safety ----------
+  function pwHasRuntime() {
+    try {
+      return !!(chrome?.runtime && chrome.runtime.id);
+    } catch {
+      return false;
+    }
+  }
+
+  function pwSendMessageSafe(message, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+
+      const t = setTimeout(() => {
+        if (done) return;
+        done = true;
+        reject(new Error("timeout: no response from background"));
+      }, timeoutMs);
+
+      try {
+        chrome.runtime.sendMessage(message, (resp) => {
+          if (done) return;
+          done = true;
+          clearTimeout(t);
+
+          const err = chrome.runtime?.lastError;
+          if (err) return reject(new Error(err.message || "runtime.lastError"));
+          if (!resp) return reject(new Error("empty response from background"));
+          resolve(resp);
+        });
+      } catch (e) {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        reject(e);
+      }
+    });
+  }
+
+  async function pwSessionRpc(action, payload) {
+    if (!pwHasRuntime()) {
+      return { ok: false, error: "no runtime (extension context missing)" };
+    }
+    try {
+      return await pwSendMessageSafe(
+        { type: ALLOW_ACTION_TYPE, action, payload },
+        RPC_TIMEOUT_MS
+      );
+    } catch (e) {
+      return { ok: false, error: String(e?.message || e) };
+    }
+  }
+
+  function disableInterception(reason) {
+    if (!interceptionEnabled) return;
+    interceptionEnabled = false;
+    pwLog("DISABLE interception (fail-open)", { reason });
+    try {
+      document.removeEventListener("click", onClickCapture, true);
+    } catch {}
+  }
+
+  function cleanupOverlay() {
+    const el = document.getElementById(OVERLAY_ID);
+    if (el) el.remove();
+    overlayEl = null;
+  }
+
+  function failOpenNavigate(url, reason) {
+    pwLog("FAIL-OPEN navigate", { url, reason });
+    scanSeq++;
+    scanInFlight = false;
+    pendingUrl = null;
+    cleanupOverlay();
+
+    try {
+      window.location.assign(url);
+    } catch {
+      window.location.href = url;
+    }
+  }
+
+  // Fix BFCache “back button weirdness”
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      pwLog("BFCache restore -> reset transient state");
+      scanSeq++;
+      pendingUrl = null;
+      scanInFlight = false;
+      cleanupOverlay();
+    }
+  });
+
+  // ---------- Overlay ----------
+  function closeOverlay(reason = "user") {
+    pwLog("overlay close", { reason });
+    scanSeq++;
+    scanInFlight = false;
+    pendingUrl = null;
+    cleanupOverlay();
+  }
+
+  function ensureOverlay() {
+    if (overlayEl && document.contains(overlayEl)) return overlayEl;
+
+    overlayEl = document.createElement("div");
+    overlayEl.id = OVERLAY_ID;
+
+    overlayEl.style.position = "fixed";
+    overlayEl.style.top = "16px";
+    overlayEl.style.right = "16px";
+    overlayEl.style.zIndex = "2147483647";
+    overlayEl.style.maxWidth = "380px";
+    overlayEl.style.padding = "12px 14px";
+    overlayEl.style.borderRadius = "12px";
+    overlayEl.style.boxShadow = "0 8px 24px rgba(0,0,0,.18)";
+    overlayEl.style.fontFamily =
+      "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+    overlayEl.style.fontSize = "13px";
+    overlayEl.style.lineHeight = "1.35";
+    overlayEl.style.color = "#111";
+    overlayEl.style.background = "rgba(255,255,255,.96)";
+    overlayEl.style.border = "1px solid rgba(0,0,0,.10)";
+    overlayEl.style.backdropFilter = "blur(6px)";
+    overlayEl.style.pointerEvents = "auto";
+
+    overlayEl.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div style="font-weight:700;">PhishWatch</div>
+        <button id="pw-close" type="button" style="border:0;background:transparent;cursor:pointer;font-size:16px;">✕</button>
+      </div>
+
+      <div id="pw-status" style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+        <span aria-hidden="true">⏳</span>
+        <span>Scanning…</span>
+      </div>
+
+      <div id="pw-detail" style="margin-top:8px; color:#333; opacity:.9;"></div>
+
+      <div id="pw-actions" style="margin-top:10px; display:none; gap:8px; justify-content:flex-end;">
+        <button id="pw-cancel" type="button" style="padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid rgba(0,0,0,.14);background:rgba(0,0,0,.03);font-weight:600;">Cancel</button>
+        <button id="pw-continue" type="button" style="padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid rgba(0,0,0,.14);background:rgba(0,0,0,.08);font-weight:700;">Continue anyway</button>
+      </div>
+    `;
+
+    overlayEl.addEventListener("click", (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+
+      if (t.id === "pw-close" || t.id === "pw-cancel") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeOverlay(t.id === "pw-close" ? "close" : "cancel");
+        return;
+      }
+
+      if (t.id === "pw-continue") {
+        e.preventDefault();
+        e.stopPropagation();
+        setActionsEnabled(false);
+        continueAnyway();
+        return;
+      }
+    });
+
+    (document.body || document.documentElement).appendChild(overlayEl);
+    return overlayEl;
+  }
+
+  function setActionsEnabled(enabled) {
+    const el = overlayEl && document.contains(overlayEl) ? overlayEl : null;
+    if (!el) return;
+
+    const cancelBtn = el.querySelector("#pw-cancel");
+    const contBtn = el.querySelector("#pw-continue");
+
+    for (const btn of [cancelBtn, contBtn]) {
+      if (!btn) continue;
+      btn.disabled = !enabled;
+      btn.style.opacity = enabled ? "1" : ".55";
+      btn.style.cursor = enabled ? "pointer" : "not-allowed";
+    }
+  }
+
+  function setOverlayScanning(url) {
+    const el = ensureOverlay();
+
+    el.querySelector("#pw-status").innerHTML = `
+      <span style="
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:6px 10px;
+        border-radius:999px;
+        background:rgba(0,0,0,.06);
+        border:1px solid rgba(0,0,0,.10);
+        font-weight:800;
+        letter-spacing:.02em;
+        color:#111;
+      ">
+        <span aria-hidden="true">⏳</span>
+        SCANNING…
+      </span>
+    `;
+
+    el.querySelector("#pw-detail").textContent = url;
+    el.querySelector("#pw-actions").style.display = "none";
+    setActionsEnabled(false);
+  }
+
+  function setOverlayStillScanning() {
+    const el = ensureOverlay();
+
+    el.querySelector("#pw-status").innerHTML = `
+      <span style="
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:6px 10px;
+        border-radius:999px;
+        background:rgba(0,0,0,.06);
+        border:1px solid rgba(0,0,0,.10);
+        font-weight:800;
+        letter-spacing:.02em;
+        color:#111;
+      ">
+        <span aria-hidden="true">⏳</span>
+        STILL SCANNING…
+      </span>
+    `;
+
+    el.querySelector("#pw-actions").style.display = "none";
+    setActionsEnabled(false);
+  }
+
+  function escapeHtml(s) {
+    const str = String(s ?? "");
+    return str
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function renderScanResult(result) {
+    scanInFlight = false;
+
+    const statusEl = overlayEl.querySelector("#pw-status");
+    const detailEl = overlayEl.querySelector("#pw-detail");
+    const actionsEl = overlayEl.querySelector("#pw-actions");
+
+    actionsEl.style.display = "flex";
+    setActionsEnabled(true);
+
+    const band = (result?.risk_band || "low").toLowerCase();
+    const label = band.toUpperCase();
+
+    const bg =
+      band === "high"
+        ? "rgba(220,38,38,.12)"
+        : band === "medium"
+        ? "rgba(217,119,6,.14)"
+        : "rgba(55,65,81,.10)";
+
+    const fg =
+      band === "high"
+        ? "#b91c1c"
+        : band === "medium"
+        ? "#b45309"
+        : "#374151";
+
+    statusEl.innerHTML = `
+      <span style="
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+        padding:6px 10px;
+        border-radius:999px;
+        background:${bg};
+        color:${fg};
+        border:1px solid rgba(0,0,0,.10);
+        font-weight:800;
+        letter-spacing:.02em;
+      ">
+        ${label} RISK
+      </span>
+    `;
+
+    const summary = result?.summary || "No notable risk indicators detected.";
+    const signals = Array.isArray(result?.signals) ? result.signals : [];
+    const severityRank = { high: 3, medium: 2, low: 1 };
+
+    const topSignals = signals
+      .slice()
+      .sort((a, b) => (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0))
+      .slice(0, 3);
+
+    detailEl.innerHTML = `
+      <div style="margin-top:4px; font-weight:600;">${escapeHtml(summary)}</div>
+
+      ${
+        topSignals.length
+          ? `<div style="margin-top:8px; font-weight:600;">Why you’re seeing this:</div>
+             <ul style="margin:6px 0 0 18px; padding:0;">
+               ${topSignals
+                 .map((s) => `<li style="margin-bottom:6px;">${escapeHtml(s.explanation || "Signal detected.")}</li>`)
+                 .join("")}
+             </ul>`
+          : `<div style="margin-top:6px; opacity:.85;">No notable risk indicators detected.</div>`
+      }
+    `;
+  }
+
+  // ---------- Phase 2 context ----------
+  function detectCredentialSurface() {
+    try {
+      if (document.querySelector('input[type="password"]')) {
+        return { credential_surface: true, method: "password_input" };
+      }
+    } catch {}
+    return { credential_surface: false };
+  }
+
+  // Phase-2 Step-1: detect a password form whose action submits cross-origin
+  function detectCrossOriginCredentialFormSignal() {
+    if (!PW_ENABLE_PHASE2_CRED_FORM) return null;
+
+    try {
+      const pw = document.querySelector('input[type="password"]');
+      if (!pw) return null;
+
+      const form = pw.closest("form");
+      if (!form) return null;
+
+      const actionAttr = (form.getAttribute("action") || "").trim();
+      if (!actionAttr) return null;
+
+      const actionUrl = new URL(actionAttr, location.href);
+      const actionOrigin = actionUrl.origin;
+      const pageOrigin = location.origin;
+
+      // If action is same-origin, no signal.
+      if (actionOrigin === pageOrigin) return null;
+
+      // Avoid noise: if action goes to silently allowed destinations, don't flag.
+      if (isSilentlyAllowedTarget(actionUrl.toString())) return null;
+
+      return {
+        id: "credential_form_action_cross_origin",
+        severity: "medium",
+        explanation:
+          "This page contains a password field, but the login form submits to a different domain (possible credential harvesting).",
+        evidence: {
+          page_origin: pageOrigin,
+          form_action: actionUrl.toString(),
+          form_action_origin: actionOrigin,
+        },
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  let submitBypass = false;
+
+function resolveFormActionUrl(form) {
+  try {
+    const raw = (form.getAttribute("action") || "").trim();
+    if (!raw) return null;
+    return new URL(raw, window.location.href).toString();
+  } catch {
+    return null;
+  }
+}
+
+function detectCrossOriginCredentialSubmitSignalForForm(form) {
+  try {
+    if (!form || typeof form.querySelector !== "function") return null;
+    const pw = form.querySelector('input[type="password"]');
+    if (!pw) return null;
+
+    const actionUrl = resolveFormActionUrl(form);
+    if (!actionUrl) return null;
+
+    const pageOrigin = window.location.origin;
+    const actionOrigin = new URL(actionUrl).origin;
+    if (actionOrigin === pageOrigin) return null;
+
+    if (isSilentlyAllowedTarget(actionUrl)) return null;
+
+    return {
+      id: "credential_form_action_cross_origin",
+      severity: "medium",
+      explanation:
+        "This password form submits credentials to a different site than the page you’re on.",
+      evidence: {
+        page_origin: pageOrigin,
+        form_action: actionUrl,
+        form_action_origin: actionOrigin,
+      },
+    };
+  } catch (e) {
+    pwLog("detectCrossOriginCredentialSubmitSignalForForm: error", { e: String(e) });
+    return null;
+  }
+}
+
+  function maxSeverityRank(signals) {
+    const r = { low: 1, medium: 2, high: 3 };
+    return (signals || []).reduce((m, s) => Math.max(m, r[(s?.severity || "").toLowerCase()] || 0), 0);
+  }
+
+  // ---------- Continue anyway ----------
+  async function continueAnyway() {
+    if (!pendingUrl) return;
+    const target = normalizeForAllowlist(pendingUrl);
+
+    // best-effort allowlist add; if background is down, proceed anyway
+    await pwSessionRpc("allowlist.add", { url: target, reason: "user_bypass" });
+
+    pendingUrl = null;
+    cleanupOverlay();
+    scanInFlight = false;
+
+    failOpenNavigate(target, "continueAnyway");
+  }
+
+  // ---------- Risk-gated scan flow ----------
+  async function runScan(url, prescanReasonList, opts) {
+    opts = opts || {};
+    const proceed =
+    typeof opts.proceed === "function"
+    ? opts.proceed
+    : () => failOpenNavigate(url);
+
+    if (!url) return;
+
+    if (!pwHasRuntime()) {
+      disableInterception("no runtime");
+      failOpenNavigate(url, "no runtime");
+      return;
+    }
+
+    if (scanInFlight && pendingUrl === url) return;
+
+    // If already scanning a different URL, do not block the user — fail-open.
+    if (scanInFlight) {
+      pwLog("scan in flight -> fail-open (do not trap)", { pendingUrl, newUrl: url });
+      failOpenNavigate(url, "scan_in_flight");
+      return;
+    }
+
+    scanInFlight = true;
+    pendingUrl = url;
+    const mySeq = ++scanSeq;
+
+    // Allowlist short-circuit BEFORE any UI
+    try {
+      const normUrl = normalizeForAllowlist(url);
+      const res = await pwSessionRpc("allowlist.has", { url: normUrl });
+      const allowed = !!(res?.ok && res.data?.allowed);
+      if (allowed) {
+        scanInFlight = false;
+        pendingUrl = null;
+        scanSeq++;
+        failOpenNavigate(normUrl, "allowlist hit");
+        return;
+      }
+    } catch {
+      // if allowlist check fails, continue with scan (but still fail-open on errors)
+    }
+
+    if (scanSeq !== mySeq) {
+      scanInFlight = false;
+      return;
+    }
+
+    // Context for backend (does not decide risk by itself)
+    const context = { page_origin: location.origin, ...detectCredentialSurface() };
+
+    // Optional: show overlay only if scanning takes too long OR result is medium/high.
+    // We start with NO overlay. If the scan is slow, show "Scanning…" to avoid feeling broken.
+    const tStill = setTimeout(() => {
+      if (scanInFlight && pendingUrl === url && scanSeq === mySeq) {
+        setOverlayScanning(url);
+        if (DEBUG && Array.isArray(prescanReasonList) && prescanReasonList.length) {
+          try {
+            const el = ensureOverlay();
+            const detail = el.querySelector("#pw-detail");
+            detail.textContent = `${url}\n\nprescan: ${prescanReasonList.join(", ")}`;
+          } catch {}
+        }
+        setOverlayStillScanning();
+      }
+    }, STILL_SCANNING_AT_MS);
+
+    try {
+      const response = await pwSendMessageSafe({ type: SCAN_TYPE, url, context }, SCAN_TIMEOUT_MS);
+
+      clearTimeout(tStill);
+      if (scanSeq !== mySeq) return;
+
+      scanInFlight = false;
+
+      const data = response?.ok ? response.data : null;
+      const err = response?.error ? String(response.error) : null;
+
+      if (err) {
+        // On scan error: fail-open silently (non-intrusive principle)
+        pwLog("scan error -> fail-open silent", { url, err });
+        pendingUrl = null;
+        scanSeq++;
+        cleanupOverlay();
+        failOpenNavigate(url, "scan_error");
+        return;
+      }
+
+      // No data? fail-open.
+      if (!data) {
+        pwLog("scan empty -> fail-open silent", { url });
+        pendingUrl = null;
+        scanSeq++;
+        cleanupOverlay();
+        failOpenNavigate(url, "scan_empty");
+        return;
+      }
+
+      // ---------------- Phase-2 local augmentation ----------------
+      // We may add a local DOM signal. If we do, we must ensure risk_band is
+      // at least as high as the max signal severity supports (never contradict severities).
+      const localSig = detectCrossOriginCredentialFormSignal();
+      if (localSig) {
+        const existing = Array.isArray(data.signals) ? data.signals : [];
+        data.signals = [localSig, ...existing];
+
+        // escalate band to medium if needed (localSig is medium)
+        const maxRank = maxSeverityRank(data.signals);
+        const bandRank = { low: 1, medium: 2, high: 3 }[(String(data.risk_band || "low")).toLowerCase()] || 1;
+
+        const neededBand = maxRank >= 3 ? "high" : maxRank >= 2 ? "medium" : "low";
+        if (bandRank < (maxRank || 1)) data.risk_band = neededBand;
+
+        // add a band-neutral summary if missing
+        if (!data.summary) {
+          data.summary = "Some indicators suggest this destination may not be trustworthy.";
+        }
+      }
+
+      const band = String(data.risk_band || "low").toLowerCase();
+
+      // RISK-GATED UX:
+      // - LOW -> no overlay, just proceed
+      // - MEDIUM/HIGH -> show overlay and require user choice
+      if (band === "low") {
+        pwLog("LOW -> proceed silently", { url });
+        pendingUrl = null;
+        scanSeq++;
+        cleanupOverlay();
+        failOpenNavigate(url, "low_risk_silent");
+        return;
+      }
+
+      // Medium/high -> show overlay now (even if it wasn't shown yet)
+      setOverlayScanning(url);
+      renderScanResult(data);
+      // Keep pendingUrl so Continue anyway works.
+      return;
+    } catch (e) {
+      clearTimeout(tStill);
+      if (scanSeq !== mySeq) return;
+
+      // Background unavailable/timeouts -> fail-open and disable interception so we never trap again
+      const msg = String(e?.message || e);
+      pwLog("scan failed -> fail-open + disable interception", { url, msg });
+
+      disableInterception("background unavailable");
+
+      // Non-intrusive principle: do not trap. No overlay needed.
+      scanInFlight = false;
+      pendingUrl = null;
+      scanSeq++;
+      cleanupOverlay();
+
+      failOpenNavigate(url, "bg_unavailable");
+    }
+  }
+
+  // ---------- Click interception ----------
+  function isOutboundNavigation(targetUrl) {
+    try {
+      const u = new URL(targetUrl, location.href);
+      return u.origin !== location.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  function findAnchor(t) {
+    return t && t.closest ? t.closest("a[href]") : null;
+  }
+
+  function shouldIgnoreClick(e, a) {
+    if (e.defaultPrevented) return true;
+    if (e.button !== 0) return true;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return true;
+    if (!a) return true;
+
+    const href = a.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return true;
+    if (a.hasAttribute("download")) return true;
+
+    return false;
+  }
+
+  function onClickCapture(e) {
+    if (!interceptionEnabled) return;
+
+    const a = findAnchor(e.target);
+    if (shouldIgnoreClick(e, a)) return;
+
+    const targetAttr = (a.getAttribute("target") || "").toLowerCase();
+    if (targetAttr === "_blank") return;
+
+    const href = a.getAttribute("href");
+    let targetUrl;
+    try {
+      targetUrl = new URL(href, location.href).toString();
+    } catch {
+      return;
+    }
+
+    if (!isOutboundNavigation(targetUrl)) return;
+
+    // 1) Silent allowlist: never intercept
+    if (isSilentlyAllowedTarget(targetUrl)) {
+      pwLog("SILENT allowlist -> allow", { targetUrl });
+      return;
+    }
+
+    // 2) Pre-scan gate: only scan if we have at least one hint
+    const ctx = { page_origin: location.origin, ...detectCredentialSurface() };
+    const pre = prescanHints(targetUrl, ctx);
+
+    if (!pre.shouldScan) {
+      pwLog("PRESCAN: no hints -> allow", { targetUrl });
+      return;
+    }
+
+    pwLog("PRESCAN: scan warranted", { targetUrl, reasons: pre.reasons });
+
+    // Intercept only when we intend to scan
+    e.preventDefault();
+    e.stopPropagation();
+
+    runScan(targetUrl, pre.reasons);
+  }
+
+  document.addEventListener("click", onClickCapture, true);
+  pwLog("content.js loaded on", location.href);
+})();
