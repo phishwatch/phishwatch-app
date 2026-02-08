@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Novelty Test: Repeated Sequence</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test-box { background: #252525; border: 1px solid #333; border-radius: 10px; padding: 20px; margin: 15px 0; }
+    h1 { color: #4a9eff; }
+    button { padding: 10px 20px; background: #4a9eff; color: #fff; border: none; border-radius: 6px; cursor: pointer; margin: 5px; }
+    button:hover { background: #3a8eef; }
+    .status { padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 13px; }
+    .status-ok { background: #1e2a1e; border: 1px solid #2d5a27; color: #90ee90; }
+    .status-err { background: #2a1e1e; border: 1px solid #5a2727; color: #ff6b6b; }
+    .counter { font-size: 48px; color: #4a9eff; text-align: center; margin: 20px 0; }
+    .instructions { background: #1a2a3a; border: 1px solid #27455a; border-radius: 8px; padding: 15px; margin-top: 20px; }
+    .badge { display: inline-block; padding: 4px 10px; background: #275a27; color: #90ee90; border-radius: 4px; font-size: 12px; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>🔄 Novelty: Repeated Sequence</h1>
+  <p><span class="badge">SHOULD NOT FIRE</span> After 3+ occurrences, no longer novel</p>
+  
+  <div class="test-box">
+    <h3 style="margin-top:0">Run Counter</h3>
+    <div class="counter" id="counter">0</div>
+    <button onclick="clearAndStart()">1. Clear & Start Fresh</button>
+    <button onclick="runSequence()">2. Run Sequence</button>
+    <button onclick="checkBaseline()">3. Check Baseline</button>
+    <div id="status"></div>
+  </div>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Click "Clear & Start Fresh"</li>
+      <li>Click "Run Sequence" 4+ times (wait 3s between each)</li>
+      <li>After 3rd run, console shows: <code>isNovel: false</code></li>
+      <li>Click "Check Baseline" to see counts</li>
+    </ol>
+    <p><strong>Threshold:</strong> <code>BASELINE_THRESHOLD = 3</code></p>
+  </div>
+  
+  <p><a href="../index.html">← Back</a></p>
+  
+  <script src="../pw-test-helper.js"></script>
+  <script>
+    var runCount = 0;
+    
+    function showStatus(msg, isError) {
+      var el = document.getElementById('status');
+      el.className = 'status ' + (isError ? 'status-err' : 'status-ok');
+      el.textContent = msg;
+    }
+    
+    function clearAndStart() {
+      if (!window.PhishWatchTestHelper || !PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available', true);
+        return;
+      }
+      PhishWatchTestHelper.clearStorage()
+        .then(function() {
+          runCount = 0;
+          document.getElementById('counter').textContent = '0';
+          showStatus('Cleared! Click "Run Sequence" to begin.', false);
+        })
+        .catch(function(err) { showStatus('Error: ' + err.message, true); });
+    }
+    
+    function runSequence() {
+      // Create and focus password field
+      var pwd = document.createElement('input');
+      pwd.type = 'password';
+      pwd.style.cssText = 'position:absolute;left:-9999px';
+      document.body.appendChild(pwd);
+      pwd.focus();
+      
+      // Simulate suspicious POST after brief delay
+      setTimeout(function() {
+        window.dispatchEvent(new CustomEvent('phishwatch_net_event', {
+          detail: { destination_origin: 'https://test-destination.example', method: 'POST' }
+        }));
+        runCount++;
+        document.getElementById('counter').textContent = runCount;
+        document.body.removeChild(pwd);
+        showStatus('Run #' + runCount + ' complete. Check console for isNovel status.', false);
+      }, 100);
+    }
+    
+    function checkBaseline() {
+      if (!window.PhishWatchTestHelper || !PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available', true);
+        return;
+      }
+      PhishWatchTestHelper.getBaseline()
+        .then(function(resp) {
+          var baseline = resp.data.baseline || {};
+          var msg = 'Baseline entries:\n';
+          for (var key in baseline) {
+            msg += key.split('||')[1] + ': ' + baseline[key] + ' times\n';
+          }
+          alert(msg || 'No baseline entries');
+          showStatus('Baseline checked (see alert)', false);
+        })
+        .catch(function(err) { showStatus('Error: ' + err.message, true); });
+    }
+  </script>
+</body>
+</html>

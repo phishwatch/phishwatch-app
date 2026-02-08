@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gate 1 Test: Seed Phrase Field</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    .test-box {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 20px 0;
+    }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 15px;
+      font-family: monospace;
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #4a9eff;
+    }
+    .instructions {
+      background: #1e2a1e;
+      border: 1px solid #2d5a27;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #275a27;
+      color: #90ee90;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .wallet-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>🔑 Gate 1 Test: Seed Phrase Field</h1>
+  <p><span class="badge">SHOULD NOT FIRE</span> Phase 4 novelty should be SKIPPED for crypto wallet seed phrases</p>
+  
+  <div class="test-box">
+    <div class="wallet-icon">💰</div>
+    <h3 style="color: #fff; margin-top: 0;">Restore Your Wallet</h3>
+    <p style="color: #888;">Enter your 12 or 24 word recovery phrase</p>
+    
+    <form id="seed-form" action="#" method="POST">
+      <label for="seed-phrase">Recovery Seed Phrase</label>
+      <textarea id="seed-phrase" name="seed_phrase" placeholder="word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"></textarea>
+      
+      <label for="mnemonic">Or enter mnemonic:</label>
+      <input type="text" id="mnemonic" name="mnemonic" placeholder="Enter mnemonic phrase">
+      
+      <label for="backup-phrase">Backup Phrase:</label>
+      <input type="text" id="backup-phrase" name="backup_phrase" placeholder="Enter backup phrase">
+      
+      <label for="recovery-key">Recovery Key:</label>
+      <input type="text" id="recovery-key" name="recovery_key" placeholder="Enter recovery key">
+    </form>
+  </div>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Open DevTools Console (F12)</li>
+      <li>Filter by <code>[PhishWatch</code></li>
+      <li>Click on any seed/recovery field above</li>
+      <li>Verify you see:
+        <ul>
+          <li><code>credential field focus detected... isPasswordField: false</code></li>
+          <li><code>treadmill: armed... isPasswordTriggered: false</code></li>
+        </ul>
+      </li>
+      <li>Wait for treadmill to disarm, then verify:
+        <ul>
+          <li><code>novelty: skipped (not password-triggered)</code></li>
+        </ul>
+      </li>
+    </ol>
+    <p><strong>Why:</strong> Crypto wallet interfaces often make legitimate cross-origin calls. These should still be detected as credential fields for Phase 2/3, but Phase 4 novelty is password-only.</p>
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+</body>
+</html>

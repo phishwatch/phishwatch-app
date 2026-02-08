@@ -34,7 +34,7 @@ class ResolveResult:
     error: str | None = None
 
 
-def resolve_url(url: str, timeout: float = 6.0) -> ResolveResult:
+def resolve_url(url: str, timeout: float = 1.5) -> ResolveResult:
     """
     Resolve redirects safely and ALWAYS return a ResolveResult (never None).
     If resolution fails, we fall back to analyzing the original input URL.

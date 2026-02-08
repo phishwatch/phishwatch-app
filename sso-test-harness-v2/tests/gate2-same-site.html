@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gate 2 Test: Same-Site Form Action</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    .test-box {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 20px 0;
+    }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #4a9eff;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #4a9eff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .instructions {
+      background: #1e2a1e;
+      border: 1px solid #2d5a27;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #275a27;
+      color: #90ee90;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .info-box {
+      background: #1a2a3a;
+      border: 1px solid #27455a;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    code {
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>✅ Gate 2 Test: Same-Site Form Action</h1>
+  <p><span class="badge">SHOULD NOT FIRE</span> Form action on same registrable domain is NOT suspicious</p>
+  
+  <div class="info-box">
+    <strong>ℹ️ Same-site scenario</strong><br>
+    Page origin: <code>http://localhost:8080</code> (simulating <code>app.example.com</code>)<br>
+    Form action: <code>http://localhost:8080/auth/login</code> (simulating <code>auth.example.com</code>)<br>
+    <br>
+    <em>In real SSO, this would be like <code>app.company.com</code> posting to <code>login.company.com</code></em>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="color: #fff; margin-top: 0;">Company Login</h3>
+    <p style="color: #888;">Form posts to auth subdomain (same registrable domain)</p>
+    
+    <!-- Form action is same-origin in test, but simulates same-site subdomain -->
+    <form id="login-form" action="http://localhost:8080/auth/login" method="POST" onsubmit="handleSubmit(event)">
+      <label for="email">Work Email</label>
+      <input type="email" id="email" name="email" placeholder="you@company.com" value="employee@company.com">
+      
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Enter password" value="workpassword">
+      
+      <button type="submit">Sign In</button>
+    </form>
+  </div>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Open DevTools Console (F12)</li>
+      <li>Filter by <code>[PhishWatch</code></li>
+      <li>Click on the password field</li>
+      <li>Verify you see:
+        <ul>
+          <li><code>form action analysis... originMismatch: false</code> (same origin in test)</li>
+          <li>OR <code>sameSite: true, isSuspicious: false</code> if testing with real subdomains</li>
+          <li>NO <code>form_action_origin_mismatch</code> signal</li>
+        </ul>
+      </li>
+    </ol>
+    <p><strong>Why:</strong> Many legitimate auth flows post to different subdomains within the same organization. This is normal and should not trigger mismatch detection.</p>
+    
+    <p><strong>To test with real subdomains:</strong></p>
+    <ol>
+      <li>Add to <code>/etc/hosts</code>:<br>
+        <code>127.0.0.1 app.testsite.local</code><br>
+        <code>127.0.0.1 auth.testsite.local</code>
+      </li>
+      <li>Access page at <code>http://app.testsite.local:8080/</code></li>
+      <li>Set form action to <code>http://auth.testsite.local:8080/login</code></li>
+    </ol>
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+  
+  <script>
+    function handleSubmit(e) {
+      e.preventDefault();
+      console.log('[Test] Same-site form submit');
+      alert('Same-site form submit.\n\nExpected: isSuspicious: false\n(No mismatch signal)');
+    }
+  </script>
+</body>
+</html>

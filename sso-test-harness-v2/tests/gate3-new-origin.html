@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gate 3 Test: New Origin Detection</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 700px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    .test-box {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 20px 0;
+    }
+    .test-box.danger {
+      border-color: #5a2727;
+      background: #2a1a1a;
+    }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    button {
+      padding: 14px 24px;
+      background: #ff6b6b;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button.secondary { background: #4a9eff; }
+    .instructions {
+      background: #2a1e1e;
+      border: 1px solid #5a2727;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-gate3 { background: #27455a; color: #87ceeb; }
+    .badge-fire { background: #5a2727; color: #ff6b6b; }
+    .warning-box {
+      background: #3a2a1a;
+      border: 1px solid #5a4a27;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+    a { color: #4a9eff; }
+    #status {
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      display: none;
+    }
+    #status.warning {
+      display: block;
+      background: #2a1e1e;
+      border: 1px solid #5a2727;
+      color: #ff6b6b;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Gate 3 Test: New Origin Detection</h1>
+  <p>
+    <span class="badge badge-gate3">Gate 3</span>
+    <span class="badge badge-fire">SHOULD FIRE</span>
+    Destinations not in expected set trigger <code>hasNewOrigin: true</code>
+  </p>
+  
+  <div class="warning-box">
+    <strong>⚠️ hasNewOrigin Detection</strong><br>
+    When a cross-origin request goes to a destination that is NOT in the expected set
+    (page_origin + form_action_origin + learned_origins), then <code>hasNewOrigin: true</code>.
+  </div>
+  
+  <div class="test-box danger">
+    <h3 style="color: #ff6b6b; margin-top: 0;">Step 1: Trigger Auth Window</h3>
+    <form id="login-form" action="#" method="POST">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Click here to arm treadmill">
+    </form>
+  </div>
+  
+  <div class="test-box danger">
+    <h3 style="color: #ff6b6b; margin-top: 0;">Step 2: Simulate Unknown Destination</h3>
+    <button onclick="simulateNewOrigin()">POST to Unknown Origin</button>
+    <button onclick="clearLearnedOrigins()" class="secondary">Clear Learned Origins</button>
+    <div id="status"></div>
+  </div>
+  
+  <div class="instructions">
+    <strong>Expected Console Output:</strong>
+    <ul>
+      <li><code>hasNewOrigin: true</code></li>
+      <li><code>newOrigins: ["https://unknown-destination.test"]</code></li>
+      <li><code>hasTreadmill: true</code></li>
+    </ul>
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+  
+  <script>
+    function simulateNewOrigin() {
+      var event = new CustomEvent('phishwatch_net_event', {
+        detail: { destination_origin: 'https://unknown-destination.test', method: 'POST' }
+      });
+      window.dispatchEvent(event);
+      document.getElementById('status').className = 'warning';
+      document.getElementById('status').innerHTML = '⚠️ Check console for hasNewOrigin: true';
+    }
+    
+    function clearLearnedOrigins() {
+      if (chrome && chrome.storage) {
+        chrome.storage.local.get(['pw_expected_origins_by_page_origin'], function(data) {
+          var cache = data.pw_expected_origins_by_page_origin || {};
+          delete cache[window.location.origin];
+          chrome.storage.local.set({ pw_expected_origins_by_page_origin: cache }, function() {
+            alert('Cleared learned origins');
+          });
+        });
+      }
+    }
+  </script>
+</body>
+</html>

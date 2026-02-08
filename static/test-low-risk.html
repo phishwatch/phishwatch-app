@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishWatch Test - Low Risk Links</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #2c3e50; }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-link {
+            display: block;
+            padding: 12px 16px;
+            margin: 10px 0;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        .test-link:hover {
+            background: #2980b9;
+        }
+        .expected {
+            background: #e8f5e9;
+            padding: 10px;
+            border-left: 4px solid #4caf50;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 PhishWatch Test Suite - Low Risk Links</h1>
+    <p><strong>Expected Behavior:</strong> All these links should navigate immediately without showing the PhishWatch overlay.</p>
+
+    <div class="test-section">
+        <h2>Test 1: Simple Legitimate Domain</h2>
+        <a href="https://example.com" class="test-link">Click: example.com (legitimate domain)</a>
+        <div class="expected">
+            ✅ <strong>Expected:</strong> Navigate immediately, no overlay<br>
+            📋 <strong>Log:</strong> "low risk, proceeding silently"
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: News Site</h2>
+        <a href="https://www.bbc.com/news" class="test-link">Click: BBC News</a>
+        <div class="expected">
+            ✅ <strong>Expected:</strong> Navigate immediately, no overlay<br>
+            📋 <strong>Log:</strong> "low risk, proceeding silently"
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Popular Tech Site</h2>
+        <a href="https://techcrunch.com" class="test-link">Click: TechCrunch</a>
+        <div class="expected">
+            ✅ <strong>Expected:</strong> Navigate immediately, no overlay<br>
+            📋 <strong>Log:</strong> "low risk, proceeding silently"
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Silently Allowed Domain (Google)</h2>
+        <a href="https://www.google.com/search?q=phishing" class="test-link">Click: Google Search</a>
+        <div class="expected">
+            ✅ <strong>Expected:</strong> Navigate immediately, no scanning<br>
+            📋 <strong>Log:</strong> "silently allowed target"
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 5: Silently Allowed Domain (GitHub)</h2>
+        <a href="https://github.com/trending" class="test-link">Click: GitHub</a>
+        <div class="expected">
+            ✅ <strong>Expected:</strong> Navigate immediately, no scanning<br>
+            📋 <strong>Log:</strong> "silently allowed target"
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 6: Same-Origin Link (Internal)</h2>
+        <a href="#test-section" class="test-link">Click: Internal Anchor</a>
+        <div class="expected">
+            ✅ <strong>Expected:</strong> Navigate immediately, no scanning<br>
+            📋 <strong>Log:</strong> Should not trigger PhishWatch at all
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 How to Test</h2>
+        <ol>
+            <li>Open Chrome DevTools Console (Cmd+Option+J)</li>
+            <li>Filter logs by "PhishWatch"</li>
+            <li>Click each link above</li>
+            <li>Verify no overlay appears</li>
+            <li>Check console logs match expected output</li>
+        </ol>
+    </div>
+</body>
+</html>

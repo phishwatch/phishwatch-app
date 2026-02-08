@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Novelty Test: No Treadmill</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test-box { background: #252525; border: 1px solid #333; border-radius: 12px; padding: 30px; margin: 20px 0; }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input { width: 100%; padding: 12px; border: 1px solid #444; border-radius: 8px; background: #1a1a1a; color: #fff; font-size: 16px; margin-bottom: 15px; }
+    button { padding: 14px 24px; background: #4a9eff; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .instructions { background: #1e2a1e; border: 1px solid #2d5a27; border-radius: 8px; padding: 15px; margin-top: 20px; }
+    .badge { display: inline-block; padding: 4px 10px; background: #275a27; color: #90ee90; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>✅ Novelty Test: No Treadmill</h1>
+  <p><span class="badge">SHOULD NOT FIRE</span> Novel sequence without treadmill indicator = no signal</p>
+  
+  <div class="test-box">
+    <h3 style="color: #fff; margin-top: 0;">Step 1: Clear State & Focus Password</h3>
+    <button onclick="clearAllState()">Clear Storage</button>
+    <form action="#" method="POST" style="margin-top: 15px;">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Click here, then wait">
+    </form>
+  </div>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Click "Clear Storage"</li>
+      <li>Click password field to arm treadmill</li>
+      <li>Do NOT click anything else - just wait 2 seconds</li>
+      <li>Treadmill disarms with no network activity</li>
+      <li>Check console: should see <code>novelty: novel but no treadmill indicator</code></li>
+    </ol>
+    <strong>Expected:</strong> NO <code>novel_runtime_sequence_observed</code> signal
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+  
+  <script>
+    function clearAllState() {
+      if (chrome && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.remove(['pw_sequence_baseline', 'pw_expected_origins_by_page_origin', 'pw_novel_sequences'], function() {
+          alert('Cleared. Now click password field and wait.');
+        });
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Novelty Test: Novel + Treadmill</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 50px auto; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test-box { background: #2a1a1a; border: 1px solid #5a2727; border-radius: 12px; padding: 30px; margin: 20px 0; }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input { width: 100%; padding: 12px; border: 1px solid #444; border-radius: 8px; background: #1a1a1a; color: #fff; font-size: 16px; margin-bottom: 15px; }
+    button { padding: 14px 24px; background: #ff6b6b; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; margin-right: 10px; }
+    button.secondary { background: #4a9eff; }
+    .instructions { background: #2a1e1e; border: 1px solid #5a2727; border-radius: 8px; padding: 15px; margin-top: 20px; }
+    .badge { display: inline-block; padding: 4px 10px; background: #5a2727; color: #ff6b6b; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+    a { color: #4a9eff; }
+    #status { padding: 15px; border-radius: 8px; margin-top: 15px; display: none; }
+    #status.fire { display: block; background: #2a1e1e; border: 1px solid #5a2727; color: #ff6b6b; }
+  </style>
+</head>
+<body>
+  <h1>🔥 Novelty Test: Novel + Treadmill</h1>
+  <p><span class="badge">SHOULD FIRE</span> First-time sequence with treadmill indicator emits research signal</p>
+  
+  <div class="test-box">
+    <h3 style="color: #ff6b6b; margin-top: 0;">Step 1: Clear Previous State</h3>
+    <button onclick="clearAllState()" class="secondary">Clear All PhishWatch Storage</button>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="color: #ff6b6b; margin-top: 0;">Step 2: Trigger Auth Window</h3>
+    <form action="#" method="POST">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Click here to arm treadmill">
+    </form>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="color: #ff6b6b; margin-top: 0;">Step 3: Trigger Treadmill Indicator</h3>
+    <button onclick="simulateSuspiciousActivity()">Simulate Suspicious POST</button>
+    <div id="status"></div>
+  </div>
+  
+  <div class="instructions">
+    <strong>Expected:</strong> <code>novel_runtime_sequence_observed</code> signal with <code>is_novel: true, hasTreadmill: true</code>
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+  
+  <script>
+    function clearAllState() {
+      if (chrome && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.remove(['pw_sequence_baseline', 'pw_expected_origins_by_page_origin', 'pw_novel_sequences', 'pw_baseline_last_updated'], function() {
+          alert('Cleared all PhishWatch storage.');
+        });
+      }
+    }
+    function simulateSuspiciousActivity() {
+      window.dispatchEvent(new CustomEvent('phishwatch_net_event', {
+        detail: { destination_origin: 'https://suspicious-relay.attacker.test', method: 'POST' }
+      }));
+      document.getElementById('status').className = 'fire';
+      document.getElementById('status').innerHTML = '🔥 Check console for novel_runtime_sequence_observed!';
+    }
+  </script>
+</body>
+</html>

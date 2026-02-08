@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gate 2 Test: Trusted Auth Domain</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+    .test-box {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 20px 0;
+    }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #4a9eff;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: #4285f4;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .instructions {
+      background: #1e2a1e;
+      border: 1px solid #2d5a27;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #275a27;
+      color: #90ee90;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .info-box {
+      background: #1a2a3a;
+      border: 1px solid #27455a;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    code {
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .google-logo {
+      font-size: 24px;
+      margin-right: 10px;
+    }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>🔐 Gate 2 Test: Trusted Auth Domain</h1>
+  <p><span class="badge">SHOULD NOT FIRE</span> Form action to trusted IdP (Google, Okta, etc.) is NOT suspicious</p>
+  
+  <div class="info-box">
+    <strong>ℹ️ Trusted Auth Domain scenario</strong><br>
+    Page origin: <code>http://localhost:8080</code> (your app)<br>
+    Form action: <code>https://accounts.google.com/signin</code> (trusted IdP)<br>
+    <br>
+    <em>Apps legitimately redirect to Google, Okta, Auth0, etc. for authentication</em>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="color: #fff; margin-top: 0;"><span class="google-logo">G</span> Sign in with Google</h3>
+    <p style="color: #888;">This form posts to Google's authentication servers</p>
+    
+    <!-- Form action points to trusted auth provider -->
+    <form id="google-form" action="https://accounts.google.com/signin/v2/identifier" method="POST" onsubmit="handleSubmit(event)">
+      <label for="email">Google Email</label>
+      <input type="email" id="email" name="email" placeholder="you@gmail.com" value="user@gmail.com">
+      
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Enter password" value="googlepassword">
+      
+      <button type="submit">Continue to Google</button>
+    </form>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="color: #fff; margin-top: 0;">Other Trusted Providers</h3>
+    <p style="color: #888;">Test forms for other trusted auth domains:</p>
+    
+    <form action="https://login.microsoftonline.com/common/oauth2/v2.0/authorize" method="POST" onsubmit="handleSubmit(event)" style="margin-bottom: 15px;">
+      <input type="password" name="password" placeholder="Microsoft login" style="margin-bottom: 5px;">
+      <button type="submit" style="background: #00a4ef;">Microsoft</button>
+    </form>
+    
+    <form action="https://okta.com/oauth2/default/v1/authorize" method="POST" onsubmit="handleSubmit(event)" style="margin-bottom: 15px;">
+      <input type="password" name="password" placeholder="Okta login" style="margin-bottom: 5px;">
+      <button type="submit" style="background: #007dc1;">Okta</button>
+    </form>
+    
+    <form action="https://auth0.com/authorize" method="POST" onsubmit="handleSubmit(event)">
+      <input type="password" name="password" placeholder="Auth0 login" style="margin-bottom: 5px;">
+      <button type="submit" style="background: #eb5424;">Auth0</button>
+    </form>
+  </div>
+  
+  <div class="instructions">
+    <strong>Instructions:</strong>
+    <ol>
+      <li>Open DevTools Console (F12)</li>
+      <li>Filter by <code>[PhishWatch</code></li>
+      <li>Click on any password field above</li>
+      <li>Verify you see:
+        <ul>
+          <li><code>form action analysis... isTrustedAuth: true, isSuspicious: false</code></li>
+          <li>NO <code>form_action_origin_mismatch</code> signal</li>
+        </ul>
+      </li>
+    </ol>
+    <p><strong>Trusted Auth Domains:</strong></p>
+    <ul style="font-size: 13px; color: #aaa;">
+      <li>accounts.google.com</li>
+      <li>login.microsoftonline.com, login.live.com</li>
+      <li>appleid.apple.com</li>
+      <li>github.com, gitlab.com</li>
+      <li>okta.com, auth0.com, onelogin.com</li>
+      <li>duo.com, pingidentity.com</li>
+      <li>checkout.stripe.com, paypal.com</li>
+    </ul>
+  </div>
+  
+  <p><a href="../index.html">← Back to Test Harness</a></p>
+  
+  <script>
+    function handleSubmit(e) {
+      e.preventDefault();
+      console.log('[Test] Trusted auth form submit');
+      alert('Trusted auth provider form submit.\n\nExpected: isTrustedAuth: true, isSuspicious: false\n(No mismatch signal)');
+    }
+  </script>
+</body>
+</html>

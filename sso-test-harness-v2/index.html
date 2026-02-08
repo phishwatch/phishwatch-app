@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhishWatch Phase 4 SSO-Safe Test Harness v2</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; background: #0a0a0a; color: #e0e0e0; }
+    h1 { color: #fff; border-bottom: 2px solid #333; padding-bottom: 10px; }
+    h2 { color: #4a9eff; margin-top: 30px; }
+    .test-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px; }
+    .test-card { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 15px; }
+    .test-card h3 { margin: 0 0 10px 0; color: #fff; font-size: 14px; }
+    .test-card p { color: #888; font-size: 13px; margin: 0 0 15px 0; }
+    .badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; margin-right: 5px; }
+    .badge-pass { background: #275a27; color: #90ee90; }
+    .badge-fire { background: #5a2727; color: #ff6b6b; }
+    .btn { display: inline-block; padding: 8px 16px; background: #4a9eff; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; border: none; cursor: pointer; }
+    .btn:hover { background: #3a8eef; }
+    .btn-danger { background: #ff6b6b; }
+    .storage-panel { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 20px; margin: 20px 0; }
+    .storage-panel button { margin: 5px; }
+    #storage-output { background: #111; border: 1px solid #333; border-radius: 6px; padding: 15px; margin-top: 15px; font-family: monospace; font-size: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; }
+    .status { padding: 10px; border-radius: 6px; margin-top: 10px; }
+    .status-ok { background: #1e2a1e; border: 1px solid #2d5a27; color: #90ee90; }
+    .status-err { background: #2a1e1e; border: 1px solid #5a2727; color: #ff6b6b; }
+    .instructions { background: #1a1a2e; border: 1px solid #3a3a5e; border-radius: 10px; padding: 15px; margin: 20px 0; }
+    .instructions ol { margin: 10px 0; padding-left: 20px; }
+    .instructions li { margin: 8px 0; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🛡️ PhishWatch SSO-Safe Test Harness v2</h1>
+  
+  <div class="instructions">
+    <h3 style="margin-top: 0;">⚠️ Setup Required</h3>
+    <ol>
+      <li>Add the test helper message handler to your <code>background.js</code> (see <code>background-additions.js</code>)</li>
+      <li>Reload the extension in <code>chrome://extensions</code></li>
+      <li>Start test server: <code>python3 -m http.server 8080</code></li>
+      <li>Open DevTools Console and filter by <code>[PhishWatch</code></li>
+    </ol>
+  </div>
+
+  <div class="storage-panel">
+    <h3 style="margin-top: 0;">🔧 Storage Controls</h3>
+    <button class="btn" onclick="viewStorage()">View All Storage</button>
+    <button class="btn btn-danger" onclick="clearStorage()">Clear All Storage</button>
+    <button class="btn" onclick="viewBaseline()">View Baseline</button>
+    <button class="btn" onclick="viewExpectedOrigins()">View Expected Origins</button>
+    <div id="storage-status"></div>
+    <div id="storage-output">Click a button to view storage...</div>
+  </div>
+
+  <h2>🚪 Gate 1: Password-Only Triggers</h2>
+  <p>Phase 4 novelty should ONLY arm for password fields, not OTP/seed.</p>
+  <div class="test-grid">
+    <div class="test-card">
+      <h3><span class="badge badge-fire">SHOULD FIRE</span> Password Focus</h3>
+      <p>Expect: <code>isPasswordTriggered: true</code></p>
+      <a href="tests/gate1-password-focus.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-pass">SHOULD NOT</span> OTP Focus</h3>
+      <p>Expect: <code>novelty: skipped</code></p>
+      <a href="tests/gate1-otp-focus.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-pass">SHOULD NOT</span> Seed Phrase</h3>
+      <p>Expect: <code>novelty: skipped</code></p>
+      <a href="tests/gate1-seed-field.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-fire">SHOULD FIRE</span> Password Submit</h3>
+      <p>Expect: <code>hasPassword: true</code></p>
+      <a href="tests/gate1-password-submit.html" class="btn">Run Test</a>
+    </div>
+  </div>
+
+  <h2>🎯 Gate 2: Form Action Mismatch</h2>
+  <p>Mismatch is primary signal. Same-site and trusted auth are NOT suspicious.</p>
+  <div class="test-grid">
+    <div class="test-card">
+      <h3><span class="badge badge-fire">SHOULD FIRE</span> Form Mismatch</h3>
+      <p>Expect: <code>form_action_origin_mismatch</code></p>
+      <a href="tests/gate2-form-mismatch.html" class="btn btn-danger">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-pass">SHOULD NOT</span> Same-Site</h3>
+      <p>Expect: <code>isSuspicious: false</code></p>
+      <a href="tests/gate2-same-site.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-pass">SHOULD NOT</span> Trusted Auth</h3>
+      <p>Expect: <code>isTrustedAuth: true</code></p>
+      <a href="tests/gate2-trusted-auth.html" class="btn">Run Test</a>
+    </div>
+  </div>
+
+  <h2>📚 Gate 3: Expected Origins Learning</h2>
+  <p>Origins learned from benign windows. Suspicious windows don't learn.</p>
+  <div class="test-grid">
+    <div class="test-card">
+      <h3>Learn Benign Window</h3>
+      <p>Expect: <code>learning origins (benign window)</code></p>
+      <a href="tests/gate3-learn-benign.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-fire">GUARDED</span> No Learn Suspicious</h3>
+      <p>Expect: <code>NOT learning origins</code></p>
+      <a href="tests/gate3-no-learn-suspicious.html" class="btn btn-danger">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3>Expected Set Building</h3>
+      <p>Test seeding and expected set</p>
+      <a href="tests/gate3-expected-set.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-fire">SHOULD FIRE</span> New Origin</h3>
+      <p>Expect: <code>hasNewOrigin: true</code></p>
+      <a href="tests/gate3-new-origin.html" class="btn btn-danger">Run Test</a>
+    </div>
+  </div>
+
+  <h2>🔄 Novelty Correlation</h2>
+  <p>Novelty emits only when BOTH novel AND treadmill present.</p>
+  <div class="test-grid">
+    <div class="test-card">
+      <h3><span class="badge badge-fire">SHOULD FIRE</span> Novel + Treadmill</h3>
+      <p>Expect: <code>novel_runtime_sequence_observed</code></p>
+      <a href="tests/novelty-with-treadmill.html" class="btn btn-danger">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-pass">SHOULD NOT</span> No Treadmill</h3>
+      <p>Expect: <code>novel but no treadmill</code></p>
+      <a href="tests/novelty-no-treadmill.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-pass">SHOULD NOT</span> Repeated</h3>
+      <p>Expect: <code>not novel (seen N times)</code></p>
+      <a href="tests/novelty-repeated.html" class="btn">Run Test</a>
+    </div>
+  </div>
+
+  <h2>🌐 SSO Simulations</h2>
+  <div class="test-grid">
+    <div class="test-card">
+      <h3><span class="badge badge-pass">SHOULD NOT</span> Google SSO</h3>
+      <p>Expect: <code>hasNewOrigin: false</code> after seeding</p>
+      <a href="tests/sso-google-sim.html" class="btn">Run Test</a>
+    </div>
+    <div class="test-card">
+      <h3><span class="badge badge-fire">SHOULD FIRE</span> AiTM Proxy</h3>
+      <p>Expect: mismatch + novelty signals</p>
+      <a href="tests/sso-aitm-sim.html" class="btn btn-danger">Run Test</a>
+    </div>
+  </div>
+
+  <script src="pw-test-helper.js"></script>
+  <script>
+    function showStatus(msg, isError) {
+      var el = document.getElementById('storage-status');
+      el.className = 'status ' + (isError ? 'status-err' : 'status-ok');
+      el.textContent = msg;
+    }
+    
+    function showOutput(data) {
+      document.getElementById('storage-output').textContent = JSON.stringify(data, null, 2);
+    }
+    
+    function viewStorage() {
+      if (!window.PhishWatchTestHelper || !window.PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available. Make sure background-additions.js is added to your extension.', true);
+        return;
+      }
+      PhishWatchTestHelper.getStorage()
+        .then(function(resp) {
+          showStatus('Storage loaded', false);
+          showOutput(resp.data);
+        })
+        .catch(function(err) {
+          showStatus('Error: ' + err.message, true);
+        });
+    }
+    
+    function clearStorage() {
+      if (!window.PhishWatchTestHelper || !window.PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available', true);
+        return;
+      }
+      if (!confirm('Clear all PhishWatch storage?')) return;
+      PhishWatchTestHelper.clearStorage()
+        .then(function(resp) {
+          showStatus('Storage cleared!', false);
+          showOutput({ message: 'All PhishWatch storage cleared' });
+        })
+        .catch(function(err) {
+          showStatus('Error: ' + err.message, true);
+        });
+    }
+    
+    function viewBaseline() {
+      if (!window.PhishWatchTestHelper || !window.PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available', true);
+        return;
+      }
+      PhishWatchTestHelper.getBaseline()
+        .then(function(resp) {
+          showStatus('Baseline loaded', false);
+          showOutput(resp.data);
+        })
+        .catch(function(err) {
+          showStatus('Error: ' + err.message, true);
+        });
+    }
+    
+    function viewExpectedOrigins() {
+      if (!window.PhishWatchTestHelper || !window.PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available', true);
+        return;
+      }
+      PhishWatchTestHelper.getExpectedOrigins()
+        .then(function(resp) {
+          showStatus('Expected origins for ' + window.location.origin, false);
+          showOutput({ origins: resp.data, entry: resp.entry });
+        })
+        .catch(function(err) {
+          showStatus('Error: ' + err.message, true);
+        });
+    }
+  </script>
+</body>
+</html>

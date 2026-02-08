@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gate 3: Learn Benign Window</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test-box { background: #252525; border: 1px solid #333; border-radius: 10px; padding: 20px; margin: 15px 0; }
+    h1 { color: #4a9eff; }
+    label { display: block; margin-bottom: 8px; color: #aaa; }
+    input { width: 100%; padding: 10px; border: 1px solid #444; border-radius: 6px; background: #1a1a1a; color: #fff; font-size: 16px; margin-bottom: 10px; }
+    button { padding: 10px 20px; background: #4a9eff; color: #fff; border: none; border-radius: 6px; cursor: pointer; margin: 5px; }
+    button:hover { background: #3a8eef; }
+    .status { padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 13px; }
+    .status-ok { background: #1e2a1e; border: 1px solid #2d5a27; color: #90ee90; }
+    .status-err { background: #2a1e1e; border: 1px solid #5a2727; color: #ff6b6b; }
+    .instructions { background: #1a2a3a; border: 1px solid #27455a; border-radius: 8px; padding: 15px; margin-top: 20px; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+    a { color: #4a9eff; }
+  </style>
+</head>
+<body>
+  <h1>📚 Gate 3: Learn Benign Window</h1>
+  
+  <div class="test-box">
+    <h3 style="margin-top:0">Storage Controls</h3>
+    <button onclick="clearStorage()">Clear Storage</button>
+    <button onclick="checkLearnedOrigins()">Check Learned Origins</button>
+    <div id="status"></div>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="margin-top:0">Step 1: Focus Password Field</h3>
+    <form action="#" method="POST">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Click here to arm treadmill">
+    </form>
+  </div>
+  
+  <div class="test-box">
+    <h3 style="margin-top:0">Step 2: Simulate Benign Activity</h3>
+    <p style="color:#888">Simulates same-origin POST (benign, should trigger learning)</p>
+    <button onclick="simulateBenignActivity()">Simulate Same-Origin POST</button>
+  </div>
+  
+  <div class="instructions">
+    <strong>Expected Console Output:</strong>
+    <ul>
+      <li><code>novelty: learning origins (benign window)</code></li>
+      <li><code>expected origins: updated for page</code></li>
+    </ul>
+    <p>After test, click "Check Learned Origins" to verify storage.</p>
+  </div>
+  
+  <p><a href="../index.html">← Back</a></p>
+  
+  <script src="../pw-test-helper.js"></script>
+  <script>
+    function showStatus(msg, isError) {
+      var el = document.getElementById('status');
+      el.className = 'status ' + (isError ? 'status-err' : 'status-ok');
+      el.textContent = msg;
+    }
+    
+    function clearStorage() {
+      if (!window.PhishWatchTestHelper || !PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available. Add background-additions.js to your extension.', true);
+        return;
+      }
+      PhishWatchTestHelper.clearStorage()
+        .then(function() { showStatus('Storage cleared!', false); })
+        .catch(function(err) { showStatus('Error: ' + err.message, true); });
+    }
+    
+    function checkLearnedOrigins() {
+      if (!window.PhishWatchTestHelper || !PhishWatchTestHelper.isAvailable()) {
+        showStatus('Extension not available', true);
+        return;
+      }
+      PhishWatchTestHelper.getExpectedOrigins()
+        .then(function(resp) {
+          if (resp.data && resp.data.length > 0) {
+            showStatus('Learned origins: ' + resp.data.join(', '), false);
+          } else {
+            showStatus('No origins learned yet for this page', false);
+          }
+        })
+        .catch(function(err) { showStatus('Error: ' + err.message, true); });
+    }
+    
+    function simulateBenignActivity() {
+      window.dispatchEvent(new CustomEvent('phishwatch_net_event', {
+        detail: { destination_origin: window.location.origin, method: 'POST' }
+      }));
+      showStatus('Dispatched same-origin POST. Check console for learning logs.', false);
+    }
+  </script>
+</body>
+</html>

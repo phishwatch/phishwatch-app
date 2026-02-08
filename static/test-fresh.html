@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhishWatch - Fresh Test (Clean Allowlist)</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #2c3e50;
+            margin: 0 0 10px 0;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            margin: 0 0 30px 0;
+            font-size: 16px;
+        }
+        .info-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .info-box h3 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        .info-box p {
+            margin: 0;
+            color: #856404;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 20px 0;
+            border-left: 5px solid #e74c3c;
+        }
+        .test-section.safe {
+            border-left-color: #27ae60;
+        }
+        .test-section h2 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+            font-size: 20px;
+        }
+        .test-link {
+            display: inline-block;
+            padding: 14px 24px;
+            margin: 10px 10px 10px 0;
+            background: #e74c3c;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .test-link:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+        }
+        .test-link.safe {
+            background: #27ae60;
+        }
+        .test-link.safe:hover {
+            background: #229954;
+        }
+        .expected {
+            background: white;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            margin-top: 15px;
+            font-size: 14px;
+            border-radius: 6px;
+        }
+        .expected strong {
+            color: #3498db;
+        }
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-left: 10px;
+        }
+        .status-high { background: #fee; color: #c0392b; }
+        .status-medium { background: #fff3cd; color: #856404; }
+        .status-low { background: #d4edda; color: #155724; }
+        
+        .instructions {
+            background: #e8f4f8;
+            border: 2px solid #3498db;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .instructions h3 {
+            margin: 0 0 15px 0;
+            color: #2c3e50;
+        }
+        .instructions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ PhishWatch - Fresh Test Suite</h1>
+        <p class="subtitle">Clean slate - No allowlisted URLs</p>
+
+        <div class="info-box">
+            <h3>⚠️ Test Status</h3>
+            <p>These are FRESH test links that have never been clicked before. Your allowlist is clean for these URLs, so you'll see the full PhishWatch behavior.</p>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Testing Instructions</h3>
+            <ol>
+                <li>Open Chrome DevTools Console (Cmd+Option+J or F12)</li>
+                <li>Filter logs by typing "PhishWatch" in the filter box</li>
+                <li>Click each test link below</li>
+                <li>Watch for overlay on suspicious links</li>
+                <li>Check console logs for detailed behavior</li>
+            </ol>
+        </div>
+
+        <!-- HIGH RISK TESTS -->
+        <div class="test-section">
+            <h2>Test 1: Different IP Address + Redirect <span class="status-indicator status-high">HIGH RISK</span></h2>
+            <a href="http://10.0.0.1/auth?redirect=https://secure-login.com&next=https://account.verify.com" class="test-link">
+                🔴 Click: 10.0.0.1 with multiple redirects
+            </a>
+            <div class="expected">
+                <strong>Expected:</strong> PhishWatch overlay appears<br>
+                <strong>Signals:</strong> ip_in_url, credential_keywords, multiple redirect params<br>
+                <strong>Risk Band:</strong> HIGH or MEDIUM<br>
+                <strong>Console:</strong> Should see "onClickCapture → runScan → medium/high risk, showing overlay"
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 2: IP + Login Keywords <span class="status-indicator status-high">HIGH RISK</span></h2>
+            <a href="http://172.16.0.1/login.php?user=admin&return=https://payment-verify.com" class="test-link">
+                🔴 Click: 172.16.0.1 with login keywords
+            </a>
+            <div class="expected">
+                <strong>Expected:</strong> PhishWatch overlay appears<br>
+                <strong>Signals:</strong> ip_in_url, credential_keywords<br>
+                <strong>Risk Band:</strong> HIGH
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 3: Punycode + Redirect Chain <span class="status-indicator status-medium">MEDIUM RISK</span></h2>
+            <a href="https://xn--pple-43d.xn--p1ai/verify?redirect=https://account-security.com&token=abc123" class="test-link">
+                🟡 Click: Punycode domain with redirect
+            </a>
+            <div class="expected">
+                <strong>Expected:</strong> PhishWatch overlay appears<br>
+                <strong>Signals:</strong> punycode_idn, redirect parameters<br>
+                <strong>Risk Band:</strong> MEDIUM
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 4: URL Shortener <span class="status-indicator status-medium">MEDIUM RISK</span></h2>
+            <a href="https://tinyurl.com/phish-test-abc123" class="test-link">
+                🟡 Click: tinyurl.com shortener
+            </a>
+            <div class="expected">
+                <strong>Expected:</strong> PhishWatch overlay appears<br>
+                <strong>Signals:</strong> shortener_like_host<br>
+                <strong>Risk Band:</strong> MEDIUM
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Test 5: Super Long Suspicious URL <span class="status-indicator status-medium">MEDIUM RISK</span></h2>
+            <a href="https://verify-account-security-update-required-urgent-action-needed-immediately.suspicious-domain.com/login/auth/verify?session=abc123def456ghi789jkl012mno345pqr678stu901vwx234yz&redirect=https://final-destination-secure-login-portal.com&token=verylongtoken123456789" class="test-link">
+                🟡 Click: Very long suspicious URL
+            </a>
+            <div class="expected">
+                <strong>Expected:</strong> PhishWatch overlay appears<br>
+                <strong>Signals:</strong> long_url, long_query, multiple subdomains<br>
+                <strong>Risk Band:</strong> MEDIUM or HIGH
+            </div>
+        </div>
+
+        <!-- LOW RISK / SAFE TESTS -->
+        <div class="test-section safe">
+            <h2>Test 6: Legitimate Short URL <span class="status-indicator status-low">LOW RISK</span></h2>
+            <a href="https://wikipedia.org/wiki/Phishing" class="test-link safe">
+                🟢 Click: Wikipedia (legitimate)
+            </a>
+            <div class="expected">
+                <strong>Expected:</strong> Navigate immediately, NO overlay<br>
+                <strong>Console:</strong> Should see "low risk, proceeding silently"
+            </div>
+        </div>
+
+        <div class="test-section safe">
+            <h2>Test 7: Silently Allowed Domain <span class="status-indicator status-low">SAFE</span></h2>
+            <a href="https://github.com/topics/security" class="test-link safe">
+                🟢 Click: GitHub (silently allowed)
+            </a>
+            <div class="expected">
+                <strong>Expected:</strong> Navigate immediately, NO overlay<br>
+                <strong>Console:</strong> Should see "silently allowed target"
+            </div>
+        </div>
+
+        <!-- ALLOWLIST TEST -->
+        <div class="test-section" style="border-left-color: #9b59b6;">
+            <h2>Test 8: Allowlist Behavior Test 🔁</h2>
+            <p style="margin: 0 0 15px 0; color: #7f8c8d;">Click Test 1 again after clicking "Continue anyway"</p>
+            <a href="http://10.0.0.1/auth?redirect=https://secure-login.com&next=https://account.verify.com" class="test-link" style="background: #9b59b6;">
+                🔁 Click: Same as Test 1 (for allowlist test)
+            </a>
+            <div class="expected" style="border-left-color: #9b59b6;">
+                <strong>First Click:</strong> Shows overlay → Click "Continue anyway"<br>
+                <strong>Second Click:</strong> Navigate immediately without overlay<br>
+                <strong>Console:</strong> Should see "URL is allowlisted, navigating immediately"
+            </div>
+        </div>
+
+        <div class="info-box" style="background: #d4edda; border-color: #28a745; margin-top: 30px;">
+            <h3 style="color: #155724;">✅ What Success Looks Like</h3>
+            <p style="color: #155724;">
+                <strong>High/Medium Risk Links:</strong> Overlay appears with clear signals<br>
+                <strong>Low Risk Links:</strong> Navigate silently without overlay<br>
+                <strong>Allowlisted Links:</strong> Second click navigates immediately<br>
+                <strong>Console Logs:</strong> Clear explanation of each decision
+            </p>
+        </div>
+
+        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 12px; text-align: center;">
+            <p style="margin: 0; color: #7f8c8d; font-size: 14px;">
+                🛡️ <strong>PhishWatch</strong> - Runtime phishing protection<br>
+                Built with ❤️ to protect users from credential theft
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // Log when page loads
+        console.log('[TEST PAGE] PhishWatch test suite loaded');
+        console.log('[TEST PAGE] Current URL:', window.location.href);
+        console.log('[TEST PAGE] Ready to test! Click links and watch console + overlay.');
+
+        // Add click logging for debugging
+        document.querySelectorAll('.test-link').forEach((link, index) => {
+            link.addEventListener('click', function(e) {
+                console.log(`[TEST PAGE] Test ${index + 1} clicked:`, this.href);
+            }, true);
+        });
+    </script>
+</body>
+</html>

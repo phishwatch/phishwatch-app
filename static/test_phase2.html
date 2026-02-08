@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhishWatch Phase 2 Test Suite</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #111; margin-bottom: 8px; }
+    .subtitle { color: #666; margin-bottom: 30px; }
+    .test-section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .test-section h2 {
+      margin-top: 0;
+      color: #333;
+      font-size: 18px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+    .test-item {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .test-item:last-child { border-bottom: none; }
+    .test-link {
+      background: #111;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    .test-link:hover { background: #333; }
+    .test-link.safe { background: #22c55e; }
+    .test-link.marketing { background: #f59e0b; }
+    .test-link.suspicious { background: #ef4444; }
+    .test-desc {
+      flex: 1;
+      font-size: 14px;
+      color: #555;
+    }
+    .expected {
+      font-size: 12px;
+      color: #888;
+      background: #f8f8f8;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .credential-section {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+    }
+    .form-test {
+      margin-top: 15px;
+      padding: 15px;
+      background: #f9fafb;
+      border-radius: 8px;
+    }
+    .form-test label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 5px;
+    }
+    .form-test input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .form-test button {
+      background: #111;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .console-note {
+      background: #1e1e1e;
+      color: #4ade80;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      margin-top: 15px;
+    }
+    .checklist {
+      list-style: none;
+      padding: 0;
+      margin: 15px 0 0 0;
+    }
+    .checklist li {
+      padding: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .checklist input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛡️ PhishWatch Phase 2 Test Suite</h1>
+  <p class="subtitle">Test each scenario and verify expected behavior. Open DevTools Console to see PhishWatch logs.</p>
+
+  <!-- Section 1: UX Fix Tests -->
+  <div class="test-section">
+    <h2>1️⃣ UX Fix: No Overlay for Safe Links</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:15px;">These links should navigate <strong>immediately without any overlay</strong>.</p>
+    
+    <div class="test-item">
+      <a href="https://www.google.com" class="test-link safe">Google</a>
+      <span class="test-desc">Tier 1 silent allow — major platform</span>
+      <span class="expected">Expected: Instant navigation</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://github.com/anthropics/claude" class="test-link safe">GitHub</a>
+      <span class="test-desc">Tier 1 silent allow — dev platform</span>
+      <span class="expected">Expected: Instant navigation</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://example.com" class="test-link safe">Example.com</a>
+      <span class="test-desc">Clean external link, no hints</span>
+      <span class="expected">Expected: No scan, instant navigation</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://stripe.com/docs/payments" class="test-link safe">Stripe Docs</a>
+      <span class="test-desc">Tier 1 silent allow — payment provider</span>
+      <span class="expected">Expected: Instant navigation</span>
+    </div>
+  </div>
+
+  <!-- Section 2: Marketing Infrastructure -->
+  <div class="test-section">
+    <h2>2️⃣ Marketing Infrastructure (Tier 2)</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:15px;">These links have tracking parameters but should <strong>navigate silently</strong> (no overlay) unless HIGH risk.</p>
+    
+    <div class="test-item">
+      <a href="https://click.mailchimp.com/track?u=abc123&id=campaign456&e=recipient789" class="test-link marketing">Mailchimp Track</a>
+      <span class="test-desc">Email marketing redirect with tracking params</span>
+      <span class="expected">Expected: Silent navigation (marketing infra)</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://t.co/abc123XYZ?utm_source=twitter&utm_medium=social" class="test-link marketing">Twitter t.co</a>
+      <span class="test-desc">Twitter link shortener</span>
+      <span class="expected">Expected: Silent navigation (marketing infra)</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://bit.ly/3example?campaign=test&source=email&token=abc123def456" class="test-link marketing">Bit.ly</a>
+      <span class="test-desc">URL shortener with tracking</span>
+      <span class="expected">Expected: Silent navigation (marketing infra)</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://gvo4au7ab.cc.rs6.net/tn.jsp?f=test123&c=tracking456&e=recipient" class="test-link marketing">Constant Contact</a>
+      <span class="test-desc">The exact pattern from your screenshot</span>
+      <span class="expected">Expected: Silent navigation (rs6.net in Tier 2)</span>
+    </div>
+  </div>
+
+  <!-- Section 3: Suspicious Links (Should Show Overlay) -->
+  <div class="test-section">
+    <h2>3️⃣ Suspicious Links (Should Show Overlay)</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:15px;">These links should trigger the <strong>PhishWatch overlay</strong> with risk information.</p>
+    
+    <div class="test-item">
+      <a href="http://192.168.1.1/login" class="test-link suspicious">IP Address URL</a>
+      <span class="test-desc">Raw IP instead of domain — HIGH risk signal</span>
+      <span class="expected">Expected: Overlay shown (ip_in_url)</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://secure-login.example.xyz/account/verify" class="test-link suspicious">Suspicious TLD + Keywords</a>
+      <span class="test-desc">.xyz TLD with credential keywords in path</span>
+      <span class="expected">Expected: Overlay shown (suspicious_tld + credential_keywords)</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://xn--pypal-4ve.com/signin" class="test-link suspicious">Punycode Domain</a>
+      <span class="test-desc">IDN/punycode that could be lookalike</span>
+      <span class="expected">Expected: Overlay shown (punycode_idn)</span>
+    </div>
+    
+    <div class="test-item">
+      <a href="https://login.account.verify.secure.example.top/auth" class="test-link suspicious">Many Subdomains</a>
+      <span class="test-desc">Excessive subdomain depth + suspicious TLD</span>
+      <span class="expected">Expected: Overlay shown (many_subdomains)</span>
+    </div>
+  </div>
+
+  <!-- Section 4: Treadmill Event Testing -->
+  <div class="test-section credential-section">
+    <h2>4️⃣ Treadmill Event Detection (Credential Fields)</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:15px;">Focus on these fields and watch the DevTools console for treadmill arming logs.</p>
+    
+    <div class="form-test">
+      <label>Password Field (should arm treadmill on focus)</label>
+      <input type="password" id="test-password" placeholder="Click here to test credential focus detection">
+      
+      <label>OTP/Verification Code Field</label>
+      <input type="text" id="test-otp" name="otp-code" placeholder="OTP field detection test">
+      
+      <label>Seed Phrase Field (crypto wallet pattern)</label>
+      <input type="text" id="test-seed" name="recovery-phrase" placeholder="Seed phrase field detection test">
+      
+      <label>Regular Text Field (should NOT arm treadmill)</label>
+      <input type="text" id="test-regular" placeholder="This should NOT trigger treadmill">
+    </div>
+    
+    <div class="console-note">
+      📋 Expected console output when focusing password field:<br>
+      <code>[PhishWatch] credential field focus detected {type: "password", ...}</code><br>
+      <code>[PhishWatch] treadmill: armed {trigger: "credential_focus", ...}</code>
+    </div>
+  </div>
+
+  <!-- Section 5: Form Submit Treadmill -->
+  <div class="test-section credential-section">
+    <h2>5️⃣ Form Submit Treadmill Test</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:15px;">Submit this form and watch for submit-time treadmill arming.</p>
+    
+    <div class="form-test">
+      <form id="test-login-form" action="#" method="POST" onsubmit="event.preventDefault(); alert('Form submitted - check console for treadmill logs');">
+        <label>Email</label>
+        <input type="email" name="email" placeholder="test@example.com">
+        
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Enter password">
+        
+        <button type="submit">Submit (Test Treadmill)</button>
+      </form>
+    </div>
+    
+    <div class="console-note">
+      📋 Expected console output on form submit:<br>
+      <code>[PhishWatch] credential form submit detected {action: "#", method: "post"}</code><br>
+      <code>[PhishWatch] treadmill: armed {trigger: "form_submit", ...}</code>
+    </div>
+  </div>
+
+  <!-- Section 6: Timeout Behavior -->
+  <div class="test-section">
+    <h2>6️⃣ Timeout Behavior (Backend Down Test)</h2>
+    <p style="font-size:14px;color:#666;margin-bottom:15px;">If your backend is stopped, these should fail-open gracefully.</p>
+    
+    <div class="test-item">
+      <a href="https://suspicious-looking-domain.xyz/login?token=abc123" class="test-link suspicious">Suspicious Link (Backend Down)</a>
+      <span class="test-desc">Stop your Docker container, then click this</span>
+      <span class="expected">Expected: "Checking..." at 800ms, navigate at 2000ms</span>
+    </div>
+    
+    <p style="font-size:13px;color:#888;margin-top:15px;">
+      <strong>To test:</strong> Run <code>docker stop phishwatch-api</code>, click the link above, then run <code>docker start phishwatch-api</code>
+    </p>
+  </div>
+
+  <!-- Test Checklist -->
+  <div class="test-section">
+    <h2>✅ Test Checklist</h2>
+    <ul class="checklist">
+      <li><input type="checkbox"> Tier 1 links (Google, GitHub, Stripe) navigate instantly</li>
+      <li><input type="checkbox"> Marketing links (Mailchimp, bit.ly, Constant Contact) navigate silently</li>
+      <li><input type="checkbox"> Suspicious links (IP, punycode, .xyz) show overlay</li>
+      <li><input type="checkbox"> Password field focus logs "treadmill: armed" in console</li>
+      <li><input type="checkbox"> OTP field focus logs "treadmill: armed" in console</li>
+      <li><input type="checkbox"> Regular text field does NOT arm treadmill</li>
+      <li><input type="checkbox"> Form submit with password field logs "form_submit" trigger</li>
+      <li><input type="checkbox"> Backend timeout shows "Checking..." then navigates</li>
+      <li><input type="checkbox"> "Continue anyway" still adds to session allowlist</li>
+      <li><input type="checkbox"> Overlay "Go back" button closes overlay without navigation</li>
+    </ul>
+  </div>
+
+  <p style="text-align:center;color:#888;font-size:13px;margin-top:30px;">
+    PhishWatch Phase 2 Test Suite — Created 2026-02-01
+  </p>
+</body>
+</html>
