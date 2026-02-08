@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "PhishWatch (Dev)",
-  "version": "0.1.0",
-  "description": "Runtime phishing signals + explainable overlay.",
+  "name": "PhishWatch",
+  "version": "2.6.1",
+  "description": "Detects browser-native phishing attacks like ConsentFix, ClickFix, and Browser-in-the-Browser that bypass traditional security.",
 
   "permissions": ["scripting", "storage"],
 
@@ -25,7 +25,7 @@
         "https://*/*"
       ],
       "js": ["content.js"],
-      "run_at": "document_idle",
+      "run_at": "document_start",
       "all_frames": true
     }
   ],
