@@ -1,0 +1,443 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-02-10",
+  "description": "Comprehensive allowlist of legitimate marketing and email service provider domains with subdomain patterns",
+
+  "subdomain_patterns": {
+    "common_patterns": [
+      "click.",
+      "click.e.",
+      "clicks.",
+      "track.",
+      "trk.",
+      "link.",
+      "links.",
+      "email.",
+      "go.",
+      "url.",
+      "mail.",
+      "newsletters.",
+      "news.",
+      "info.",
+      "notify.",
+      "notification.",
+      "updates.",
+      "send.",
+      "bounce.",
+      "messages."
+    ],
+    "pattern_notes": "These prefixes are commonly used by legitimate ESPs and companies for click tracking, open tracking, and email delivery. They typically appear as subdomains like 'click.example.com' or 'track.example.com'."
+  },
+
+  "email_service_providers": {
+    "description": "Major email service providers and their domains",
+    "providers": {
+      "SendGrid": {
+        "domains": ["sendgrid.net", "sendgrid.com"],
+        "common_subdomains": ["em*.sendgrid.net", "url*.sendgrid.net"],
+        "notes": "Twilio SendGrid is one of the largest ESPs. Uses custom branded link patterns like 'clicks.yourdomain.com' or default sendgrid.net domains.",
+        "legitimacy": "Highly trusted ESP used by major brands worldwide"
+      },
+      "Mailgun": {
+        "domains": ["mailgun.org", "mailgun.com", "mailgun.net"],
+        "common_subdomains": ["mg*.mailgun.org"],
+        "notes": "Popular transactional email API service",
+        "legitimacy": "Trusted ESP especially for developers and technical teams"
+      },
+      "Mailchimp": {
+        "domains": ["mailchimp.com", "list-manage.com"],
+        "common_subdomains": ["*.list-manage.com"],
+        "notes": "One of the most popular marketing automation platforms",
+        "legitimacy": "Widely used by small to medium businesses for email marketing"
+      },
+      "Mandrill": {
+        "domains": ["mandrillapp.com"],
+        "common_subdomains": ["mandrillapp.com"],
+        "notes": "Mailchimp's transactional email service. Custom tracking domains are subdomains pointing to mandrillapp.com",
+        "legitimacy": "Trusted transactional email service owned by Mailchimp"
+      },
+      "SparkPost": {
+        "domains": ["sparkpost.com", "spgo.io"],
+        "common_subdomains": ["*.spgo.io"],
+        "notes": "Enterprise-grade email delivery service",
+        "legitimacy": "Major ESP used for high-volume email delivery"
+      },
+      "Amazon SES": {
+        "domains": ["amazonses.com"],
+        "common_subdomains": ["*.amazonses.com"],
+        "notes": "Amazon's Simple Email Service",
+        "legitimacy": "AWS service used by many enterprises"
+      },
+      "Postmark": {
+        "domains": ["postmarkapp.com", "pm.mtasv.net"],
+        "common_subdomains": ["pm.mtasv.net"],
+        "notes": "Transactional email service focused on deliverability",
+        "legitimacy": "Trusted for transactional emails"
+      },
+      "Mailjet": {
+        "domains": ["mailjet.com"],
+        "common_subdomains": ["*.mailjet.com"],
+        "notes": "Email service provider with marketing and transactional capabilities",
+        "legitimacy": "Established ESP used globally"
+      },
+      "Brevo": {
+        "domains": ["sendinblue.com", "brevo.com"],
+        "common_subdomains": ["*.sendinblue.com"],
+        "notes": "Formerly Sendinblue, offers marketing and transactional email",
+        "legitimacy": "Popular all-in-one marketing platform"
+      },
+      "Iterable": {
+        "domains": ["iterable.com", "links.iterable.com"],
+        "common_subdomains": ["links.iterable.com"],
+        "notes": "Cross-channel marketing platform",
+        "legitimacy": "Enterprise marketing automation platform"
+      },
+      "Customer.io": {
+        "domains": ["customer.io"],
+        "common_subdomains": ["track.customer.io"],
+        "notes": "Automated messaging platform with custom link tracking domains",
+        "legitimacy": "Trusted marketing automation platform"
+      },
+      "Elastic Email": {
+        "domains": ["elasticemail.com"],
+        "common_subdomains": ["*.elasticemail.com"],
+        "notes": "Email marketing and API service",
+        "legitimacy": "Established ESP provider"
+      },
+      "MailerSend": {
+        "domains": ["mailersend.net"],
+        "common_subdomains": ["*.mailersend.net"],
+        "notes": "Transactional email service with clean APIs",
+        "legitimacy": "Modern ESP with good reputation"
+      }
+    }
+  },
+
+  "marketing_automation_platforms": {
+    "description": "Marketing automation platforms with email tracking capabilities",
+    "providers": {
+      "HubSpot": {
+        "domains": ["hubspot.com", "hs-sites.com", "hubspotemail.net"],
+        "common_subdomains": ["*.hs-sites.com", "*.hubspotemail.net"],
+        "notes": "All-in-one marketing, sales, and CRM platform. Uses custom tracking subdomains for click tracking.",
+        "legitimacy": "Major marketing automation platform used by thousands of companies"
+      },
+      "Marketo": {
+        "domains": ["marketo.com", "mktomail.com"],
+        "common_subdomains": ["*.mktomail.com"],
+        "notes": "Adobe Marketo Engage - enterprise marketing automation. Uses branded tracking domains.",
+        "legitimacy": "Enterprise-grade platform, part of Adobe Experience Cloud"
+      },
+      "Pardot": {
+        "domains": ["pardot.com", "pi.pardot.com"],
+        "common_subdomains": ["go.pardot.com", "pi.pardot.com"],
+        "notes": "Salesforce Marketing Cloud Account Engagement (formerly Pardot). B2B marketing automation.",
+        "legitimacy": "Salesforce product, widely trusted in B2B marketing"
+      },
+      "Oracle Eloqua": {
+        "domains": ["eloqua.com"],
+        "common_subdomains": ["*.eloqua.com"],
+        "notes": "Oracle's marketing automation platform",
+        "legitimacy": "Enterprise marketing automation solution"
+      },
+      "ActiveCampaign": {
+        "domains": ["activecampaign.com"],
+        "common_subdomains": ["*.activecampaign.com"],
+        "notes": "Email marketing and automation platform",
+        "legitimacy": "Popular marketing automation platform"
+      },
+      "Klaviyo": {
+        "domains": ["klaviyo.com"],
+        "common_subdomains": ["trk.yourdomain.com"],
+        "notes": "E-commerce focused marketing automation. Recommends 'trk.' prefix for custom tracking domains.",
+        "legitimacy": "Leading e-commerce marketing platform"
+      },
+      "Braze": {
+        "domains": ["braze.com"],
+        "common_subdomains": ["mail.yourdomain.com"],
+        "notes": "Customer engagement platform. Requires subdomains for sending and click tracking domains for each subdomain.",
+        "legitimacy": "Enterprise customer engagement platform"
+      },
+      "Omnisend": {
+        "domains": ["omnisend.com"],
+        "common_subdomains": ["*.omnisend.com"],
+        "notes": "E-commerce marketing automation",
+        "legitimacy": "E-commerce focused platform"
+      }
+    }
+  },
+
+  "crm_platforms": {
+    "description": "CRM platforms with email tracking capabilities",
+    "providers": {
+      "Salesforce": {
+        "domains": ["salesforce.com", "force.com"],
+        "common_subdomains": ["*.force.com"],
+        "notes": "Salesforce Marketing Cloud and Sales Cloud email tracking",
+        "legitimacy": "Leading enterprise CRM platform"
+      },
+      "Zoho": {
+        "domains": ["zoho.com", "zeptomail.com"],
+        "common_subdomains": ["*.zoho.com", "track.zoho.com"],
+        "notes": "Zoho CRM and ZeptoMail transactional email service. Uses tracking subdomains for email tracking.",
+        "legitimacy": "Major CRM and business software provider"
+      },
+      "Microsoft Dynamics": {
+        "domains": ["dynamics.com"],
+        "common_subdomains": ["*.dynamics.com"],
+        "notes": "Microsoft's CRM platform",
+        "legitimacy": "Enterprise CRM from Microsoft"
+      }
+    }
+  },
+
+  "ecommerce_platforms": {
+    "description": "E-commerce platforms and their email notification domains",
+    "providers": {
+      "Shopify": {
+        "domains": ["shopify.com", "myshopify.com"],
+        "common_subdomains": ["*.myshopify.com", "email.yourstore.com"],
+        "notes": "E-commerce platform. Stores often use custom email subdomains like 'email.brand.com' for campaigns.",
+        "legitimacy": "Leading e-commerce platform with millions of merchants"
+      },
+      "BigCommerce": {
+        "domains": ["bigcommerce.com"],
+        "common_subdomains": ["*.bigcommerce.com"],
+        "notes": "E-commerce platform with email notification capabilities",
+        "legitimacy": "Major e-commerce platform"
+      },
+      "WooCommerce": {
+        "domains": ["woocommerce.com"],
+        "common_subdomains": ["*.woocommerce.com"],
+        "notes": "WordPress e-commerce plugin, emails sent through WordPress or ESP integrations",
+        "legitimacy": "Most popular e-commerce plugin for WordPress"
+      },
+      "Magento": {
+        "domains": ["magento.com"],
+        "common_subdomains": ["*.magento.com"],
+        "notes": "Adobe Commerce (formerly Magento)",
+        "legitimacy": "Enterprise e-commerce platform"
+      }
+    }
+  },
+
+  "travel_hospitality": {
+    "description": "Hotel and travel booking confirmation domains",
+    "providers": {
+      "Expedia Group": {
+        "domains": ["expedia.com", "expediamail.com", "expediagroup.com"],
+        "common_subdomains": ["email.expedia.com", "*.expediamail.com"],
+        "notes": "Travel booking platform emails. Uses @expediagroup.com for corporate communications.",
+        "legitimacy": "Major travel booking platform",
+        "caution": "Phishing campaigns often impersonate Expedia. Verify sender addresses carefully."
+      },
+      "Booking.com": {
+        "domains": ["booking.com"],
+        "common_subdomains": ["email.booking.com", "news.booking.com"],
+        "notes": "Hotel booking platform",
+        "legitimacy": "Major hotel booking platform"
+      },
+      "Marriott": {
+        "domains": ["marriott.com", "email-marriott.com"],
+        "common_subdomains": ["email-marriott.com"],
+        "notes": "Hotel chain email notifications. Note: email-marriott.com is legitimate but best practice would be notification.marriott.com subdomain.",
+        "legitimacy": "Major hotel chain",
+        "caution": "Past data breach led to domain reputation issues. Verify emails carefully."
+      },
+      "Hilton": {
+        "domains": ["hilton.com"],
+        "common_subdomains": ["email.hilton.com"],
+        "notes": "Hotel chain email notifications",
+        "legitimacy": "Major hotel chain"
+      },
+      "Airbnb": {
+        "domains": ["airbnb.com"],
+        "common_subdomains": ["email.airbnb.com"],
+        "notes": "Vacation rental platform",
+        "legitimacy": "Major accommodation platform"
+      }
+    }
+  },
+
+  "financial_services": {
+    "description": "Financial services and payment processor email domains",
+    "providers": {
+      "PayPal": {
+        "domains": ["paypal.com", "paypal.net"],
+        "common_subdomains": ["email.paypal.com"],
+        "notes": "Payment processor notifications",
+        "legitimacy": "Major payment platform",
+        "caution": "Frequently impersonated in phishing attacks. Verify sender addresses carefully."
+      },
+      "Stripe": {
+        "domains": ["stripe.com"],
+        "common_subdomains": ["email.stripe.com"],
+        "notes": "Payment processing platform. Supports custom email domains for businesses.",
+        "legitimacy": "Major payment processor"
+      },
+      "Square": {
+        "domains": ["square.com", "squareup.com"],
+        "common_subdomains": ["email.squareup.com"],
+        "notes": "Payment processing and business tools",
+        "legitimacy": "Major payment processor"
+      },
+      "Venmo": {
+        "domains": ["venmo.com"],
+        "common_subdomains": ["email.venmo.com"],
+        "notes": "Peer-to-peer payment platform",
+        "legitimacy": "Popular P2P payment service (owned by PayPal)"
+      }
+    }
+  },
+
+  "analytics_tracking": {
+    "description": "Analytics and tracking service domains",
+    "providers": {
+      "Google Analytics": {
+        "domains": ["google-analytics.com"],
+        "common_subdomains": ["analytics.google.com"],
+        "notes": "Web analytics service. GA4 tracks subdomains automatically with same Measurement ID. Note: google.com is too broad to include in allowlist.",
+        "legitimacy": "Google's web analytics platform"
+      },
+      "Adobe Analytics": {
+        "domains": ["demdex.net"],
+        "common_subdomains": ["*.demdex.net"],
+        "notes": "Adobe Experience Cloud analytics. Uses demdex.net for cross-domain tracking cookies. Note: adobe.com is too broad to include in allowlist.",
+        "legitimacy": "Enterprise analytics platform"
+      },
+      "Segment": {
+        "domains": ["segment.com"],
+        "common_subdomains": ["*.segment.com"],
+        "notes": "Customer data platform",
+        "legitimacy": "Major customer data platform"
+      },
+      "Mixpanel": {
+        "domains": ["mixpanel.com"],
+        "common_subdomains": ["*.mixpanel.com"],
+        "notes": "Product analytics platform",
+        "legitimacy": "Popular analytics platform"
+      }
+    }
+  },
+
+  "other_legitimate_services": {
+    "description": "Other commonly encountered legitimate email services",
+    "providers": {
+      "Constant Contact": {
+        "domains": ["constantcontact.com"],
+        "common_subdomains": ["*.constantcontact.com"],
+        "notes": "Email marketing platform",
+        "legitimacy": "Established email marketing service"
+      },
+      "Campaign Monitor": {
+        "domains": ["createsend.com", "campaignmonitor.com"],
+        "common_subdomains": ["*.createsend.com"],
+        "notes": "Email marketing platform",
+        "legitimacy": "Trusted email marketing service"
+      },
+      "GetResponse": {
+        "domains": ["getresponse.com"],
+        "common_subdomains": ["*.getresponse.com"],
+        "notes": "Email marketing and automation",
+        "legitimacy": "Established marketing platform"
+      },
+      "AWeber": {
+        "domains": ["aweber.com"],
+        "common_subdomains": ["*.aweber.com"],
+        "notes": "Email marketing platform",
+        "legitimacy": "Long-established email marketing service"
+      },
+      "ConvertKit": {
+        "domains": ["convertkit.com"],
+        "common_subdomains": ["*.convertkit.com"],
+        "notes": "Email marketing for creators",
+        "legitimacy": "Popular among content creators"
+      },
+      "Drip": {
+        "domains": ["drip.com"],
+        "common_subdomains": ["*.drip.com"],
+        "notes": "E-commerce CRM and email marketing",
+        "legitimacy": "E-commerce focused platform"
+      },
+      "Intercom": {
+        "domains": ["intercom.com", "intercom.io"],
+        "common_subdomains": ["*.intercom.io"],
+        "notes": "Customer messaging platform",
+        "legitimacy": "Major customer communication platform"
+      },
+      "Zendesk": {
+        "domains": ["zendesk.com"],
+        "common_subdomains": ["*.zendesk.com"],
+        "notes": "Customer service platform with email notifications",
+        "legitimacy": "Leading customer service platform"
+      }
+    }
+  },
+
+  "validation_guidelines": {
+    "custom_tracking_domains": {
+      "description": "How to validate custom tracking domains",
+      "rules": [
+        "Custom tracking domains should be subdomains of legitimate company domains (e.g., click.company.com)",
+        "The subdomain should point to a known ESP via CNAME records",
+        "Common legitimate prefixes: click, clicks, track, trk, link, links, email, go, mail",
+        "Verify the parent domain belongs to the expected company",
+        "Check for HTTPS/SSL certificates for the tracking domain",
+        "Legitimate tracking domains inherit reputation from parent domain"
+      ]
+    },
+    "red_flags": {
+      "description": "Warning signs that a tracking domain might be suspicious",
+      "flags": [
+        "Misspelled company names in domain (e.g., amazom.com instead of amazon.com)",
+        "Unusual TLDs for well-known companies (.tk, .ml, .ga, .cf)",
+        "Random character subdomains that don't match company branding",
+        "Newly registered domains (check domain age)",
+        "Domains using hyphenated versions of brands (pay-pal.com)",
+        "Multiple subdomains that don't follow standard patterns",
+        "Domains impersonating hospitality with 'confirmation', 'booking', 'guestverify', 'cardverify' patterns"
+      ]
+    },
+    "best_practices": {
+      "description": "Best practices for evaluating email tracking domains",
+      "practices": [
+        "Always verify the full domain, not just the subdomain",
+        "Check DNS records (CNAME should point to known ESP)",
+        "Verify SPF, DKIM, and DMARC records",
+        "Cross-reference with official company communications",
+        "Be extra cautious with financial services and travel booking emails",
+        "When in doubt, visit the company website directly rather than clicking email links",
+        "Check SSL/TLS certificates for legitimacy",
+        "Use domain reputation services to check historical behavior"
+      ]
+    }
+  },
+
+  "phishing_considerations": {
+    "high_risk_impersonation_targets": [
+      "PayPal",
+      "Banks and financial institutions",
+      "Expedia and travel booking sites",
+      "Hotel chains (using confirmation/booking/guestverify patterns)",
+      "Amazon and e-commerce platforms",
+      "IRS and government agencies",
+      "Microsoft, Google, Apple services"
+    ],
+    "notes": "Even if a domain appears in this allowlist, always verify the complete domain path and use additional authentication methods (DKIM, SPF, DMARC) to confirm legitimacy. Phishers may compromise legitimate ESPs or use similar-looking domains."
+  },
+
+  "sources": {
+    "note": "This allowlist was compiled from research on legitimate email service providers, marketing automation platforms, and industry best practices as of February 2026.",
+    "references": [
+      "SendGrid documentation on click tracking and SSL",
+      "Mailchimp Transactional API tracking domain documentation",
+      "Custom tracking domain best practices from Lemwarm, Mailforge, GMass",
+      "HubSpot, Marketo, and Pardot comparison guides",
+      "Zoho and Salesforce email tracking documentation",
+      "Shopify email domain authentication guides",
+      "Stripe and PayPal domain documentation",
+      "Braze email setup and tracking documentation",
+      "Industry reports on phishing campaigns targeting hospitality and financial services"
+    ]
+  }
+}
