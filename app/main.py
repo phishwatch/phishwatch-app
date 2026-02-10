@@ -29,10 +29,12 @@ from app.scoring import score_from_signals, verdict_from_score
 
 app = FastAPI(title="PhishWatch API", version="0.2.0")
 
-BASE_DIR = Path("/app").resolve()
+BASE_DIR = Path(__file__).resolve().parent.parent  # repo root-ish (/.../phishwatch)
 STATIC_DIR = (BASE_DIR / "static").resolve()
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+if STATIC_DIR.exists() and STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+
 
 # DEV CORS ONLY
 app.add_middleware(
