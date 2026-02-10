@@ -244,6 +244,14 @@
   // v2.6.3-beta: Marketing allowlist counter for debugging
   var MARKETING_ALLOWLIST_HITS = 0;
 
+  // v2.6.3-beta: Marketing subdomain patterns (from marketing-allowlist.json)
+  // These prefixes are commonly used by ESPs for click/email tracking
+  var MARKETING_SUBDOMAIN_PATTERNS = [
+    "click.", "click.e.", "clicks.", "track.", "trk.", "link.", "links.",
+    "email.", "go.", "url.", "mail.", "newsletters.", "news.", "info.",
+    "notify.", "notification.", "updates.", "send.", "bounce.", "messages."
+  ];
+
   // =========================
   // Trusted Auth Domains
   // =========================
@@ -575,16 +583,36 @@
       var h = hostFromUrl(url).toLowerCase();
       if (!h) return false;
 
+      // Check exact domain matches (ESPs)
       for (var i = 0; i < MARKETING_INFRA_DOMAINS.length; i++) {
         var domain = String(MARKETING_INFRA_DOMAINS[i] || "").toLowerCase();
         if (!domain) continue;
         if (h === domain || h.endsWith("." + domain)) {
           // v2.6.3-beta: Debug logging for marketing allowlist hits
           MARKETING_ALLOWLIST_HITS++;
-          console.log('[PhishWatch] Marketing domain allowlisted:', h, '(matched:', domain + ', total hits:', MARKETING_ALLOWLIST_HITS + ')');
+          console.log('[PhishWatch] Marketing domain allowlisted:', h, '(matched ESP domain:', domain + ', total hits:', MARKETING_ALLOWLIST_HITS + ')');
           return true;
         }
       }
+
+      // v2.6.3-beta: Check subdomain patterns (click., track., email., etc.)
+      // Common patterns used by companies for email tracking (e.g., click.e.company.com)
+      for (var j = 0; j < MARKETING_SUBDOMAIN_PATTERNS.length; j++) {
+        var pattern = String(MARKETING_SUBDOMAIN_PATTERNS[j] || "").toLowerCase();
+        if (!pattern) continue;
+
+        // Check if host starts with the pattern (e.g., "click.e.company.com" starts with "click.")
+        if (h.startsWith(pattern) || h.indexOf("." + pattern) !== -1) {
+          // Make sure there's a parent domain (not just "click." or "email.")
+          var parts = h.split(".");
+          if (parts.length >= 3) { // e.g., click.company.com or click.e.company.com
+            MARKETING_ALLOWLIST_HITS++;
+            console.log('[PhishWatch] Marketing domain allowlisted:', h, '(matched subdomain pattern:', pattern + ', total hits:', MARKETING_ALLOWLIST_HITS + ')');
+            return true;
+          }
+        }
+      }
+
       return false;
     } catch (_) {
       return false;
