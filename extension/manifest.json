@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PhishWatch",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "Detects browser-native phishing attacks like ConsentFix, ClickFix, and Browser-in-the-Browser that bypass traditional security.",
 
   "permissions": ["scripting", "storage"],

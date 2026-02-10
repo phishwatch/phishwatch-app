@@ -1,4 +1,4 @@
-/* PhishWatch content.js — Phase 4 v2.6.2 (Security Hardened)
+/* PhishWatch content.js — Phase 4 v2.6.1 (Security Hardened)
    
    v2.6.1 Critical Security Fixes:
    - SYNTAX FIX: Removed space in hasSSOText variable (parse error)
@@ -2953,7 +2953,7 @@ function incrementBaseline(pageOrigin, hash) {
 
   pwLog("test helper bridge initialized");
 
-  pwLog("content.js loaded (Phase 4 v2.6.2 - Security Hardened)", {
+  pwLog("content.js loaded (Phase 4 v2.6.1 - Security Hardened)", {
     origin: window.location.origin,
     phase4_send_research_to_backend: PHASE4_SEND_RESEARCH_TO_BACKEND,
     phase4_show_research_in_ui: PHASE4_SHOW_RESEARCH_IN_UI,

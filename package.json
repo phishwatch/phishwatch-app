@@ -1,0 +1,29 @@
+{
+  "name": "phishwatch-testing",
+  "version": "1.0.0",
+  "description": "Automated real-world testing system for PhishWatch browser extension",
+  "main": "test-real-world-sites.js",
+  "scripts": {
+    "test": "node test-real-world-sites.js",
+    "test:sites": "node test-real-world-sites.js",
+    "clean": "rm -rf test-screenshots/* real-world-test-report.md"
+  },
+  "keywords": [
+    "phishwatch",
+    "browser-extension",
+    "testing",
+    "puppeteer",
+    "automation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^22.0.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

@@ -16,3 +16,9 @@ data/
 # Logs
 *.log
 
+# Node.js
+node_modules/
+
+# Testing
+test-screenshots/
+real-world-test-report.md
