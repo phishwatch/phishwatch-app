@@ -1,4 +1,4 @@
-/* PhishWatch content.js — Phase 4 v2.6.3-beta (Enhanced Marketing Detection)
+/* PhishWatch content.js — Phase 4 v2.6.2 (Security Hardened)
    
    v2.6.1 Critical Security Fixes:
    - SYNTAX FIX: Removed space in hasSSOText variable (parse error)
@@ -172,77 +172,34 @@
   ];
 
   // =========================
-  // Tier 2: Marketing Infrastructure Allowlist
-  // v2.6.3-beta: Comprehensive allowlist from marketing-allowlist.json (71 domains)
+  // Tier 2: Marketing Infrastructure
   // =========================
   var MARKETING_INFRA_DOMAINS = [
-    // Email Service Providers (ESPs) - 21 domains
-    // SendGrid, Mailgun, Mailchimp, Postmark, SparkPost, Amazon SES, etc.
-    "sendgrid.net", "sendgrid.com", "mailgun.org", "mailgun.com", "mailgun.net",
-    "mailchimp.com", "list-manage.com", "mandrillapp.com",
-    "sparkpost.com", "spgo.io", "amazonses.com",
-    "postmarkapp.com", "pm.mtasv.net", "mailjet.com",
-    "brevo.com", "sendinblue.com", "iterable.com", "links.iterable.com",
-    "customer.io", "elasticemail.com", "mailersend.net",
-
-    // Marketing Automation Platforms - 12 domains
-    // HubSpot, Marketo, Pardot, Klaviyo, Braze, ActiveCampaign, etc.
-    "hubspot.com", "hs-sites.com", "hubspotemail.net",
-    "marketo.com", "mktomail.com", "pardot.com", "pi.pardot.com",
-    "klaviyo.com", "braze.com", "eloqua.com",
-    "activecampaign.com", "omnisend.com",
-
-    // CRM Platforms - 5 domains
-    // Salesforce, Zoho, Microsoft Dynamics
-    "salesforce.com", "force.com", "zoho.com", "zeptomail.com",
-    "dynamics.com",
-
-    // E-commerce Platforms - 5 domains
-    // Shopify, BigCommerce, WooCommerce, Magento
-    "shopify.com", "myshopify.com", "bigcommerce.com",
-    "woocommerce.com", "magento.com",
-
-    // Travel & Hospitality - 8 domains
-    // Expedia, Booking.com, Marriott, Hilton, Airbnb
-    "expedia.com", "expediamail.com", "expediagroup.com",
-    "booking.com", "marriott.com", "email-marriott.com",
-    "hilton.com", "airbnb.com",
-
-    // Financial Services - 6 domains
-    // PayPal, Stripe, Square, Venmo
-    "paypal.com", "paypal.net", "stripe.com",
-    "square.com", "squareup.com", "venmo.com",
-
-    // Analytics & Tracking - 4 domains
-    // Google Analytics, Adobe Analytics, Segment, Mixpanel
-    "google-analytics.com", "demdex.net",
-    "segment.com", "mixpanel.com",
-
-    // Other Legitimate Services - 10 domains
-    // Campaign Monitor, Constant Contact, ConvertKit, Intercom, Zendesk, etc.
-    "constantcontact.com", "campaignmonitor.com", "createsend.com",
+    "rs6.net", "constantcontact.com", "mailchimp.com",
+    "list-manage.com", "campaign-archive.com",
+    "sendgrid.net", "sendgrid.com", "mailgun.com", "mailgun.net",
+    "postmarkapp.com", "klaviyo.com", "hubspot.com",
+    "hs-analytics.net", "hsforms.com", "marketo.com",
+    "mktoweb.com", "pardot.com", "eloqua.com",
+    "sailthru.com", "braze.com", "iterable.com",
+    "customer.io", "intercom.io", "drip.com",
     "convertkit.com", "aweber.com", "getresponse.com",
-    "drip.com", "intercom.com", "intercom.io", "zendesk.com",
-
-    // Legacy/Additional - keeping for backwards compatibility
-    "rs6.net", "campaign-archive.com", "hs-analytics.net", "hsforms.com",
-    "mktoweb.com", "sailthru.com", "sendibm3.com", "sendibm.com", "sendibm2.com",
+    "activecampaign.com", "sendinblue.com", "brevo.com",
+    "sendibm3.com", "sendibm.com", "sendibm2.com",  // SendInBlue/Brevo tracking subdomains
     "mailerlite.com", "moosend.com", "benchmark.email",
     "emma.com", "e2ma.net", "cmail19.com", "cmail20.com",
-    "doubleclick.net", "googleadservices.com",
+    "createsend.com", "doubleclick.net", "googleadservices.com",
     "googlesyndication.com", "googletagmanager.com",
-    "facebook.net", "fbcdn.net", "bing.com", "linkedin.com",
-    "ads-twitter.com", "t.co", "bit.ly", "bitly.com",
-    "rebrandly.com", "short.io", "tinyurl.com", "ow.ly", "buff.ly", "lnkd.in",
+    "google-analytics.com", "facebook.net", "fbcdn.net",
+    "bing.com", "linkedin.com", "ads-twitter.com", "t.co",
+    "bit.ly", "bitly.com", "rebrandly.com", "short.io",
+    "tinyurl.com", "ow.ly", "buff.ly", "lnkd.in",
     "typeform.com", "surveymonkey.com", "jotform.com",
-    "wufoo.com", "formstack.com", "cognito.com",
+    "wufoo.com", "formstack.com", "cognito.com", "google.com",
     "eventbrite.com", "calendly.com", "meetup.com", "zoom.us",
     "cloudfront.net", "akamaized.net", "fastly.net",
     "jsdelivr.net", "unpkg.com", "cdnjs.cloudflare.com",
   ];
-
-  // v2.6.3-beta: Marketing allowlist counter for debugging
-  var MARKETING_ALLOWLIST_HITS = 0;
 
   // =========================
   // Trusted Auth Domains
@@ -578,12 +535,8 @@
       for (var i = 0; i < MARKETING_INFRA_DOMAINS.length; i++) {
         var domain = String(MARKETING_INFRA_DOMAINS[i] || "").toLowerCase();
         if (!domain) continue;
-        if (h === domain || h.endsWith("." + domain)) {
-          // v2.6.3-beta: Debug logging for marketing allowlist hits
-          MARKETING_ALLOWLIST_HITS++;
-          console.log('[PhishWatch] Marketing domain allowlisted:', h, '(matched:', domain + ', total hits:', MARKETING_ALLOWLIST_HITS + ')');
-          return true;
-        }
+        if (h === domain) return true;
+        if (h.endsWith("." + domain)) return true;
       }
       return false;
     } catch (_) {
@@ -3000,7 +2953,7 @@ function incrementBaseline(pageOrigin, hash) {
 
   pwLog("test helper bridge initialized");
 
-  pwLog("content.js loaded (Phase 4 v2.6.3-beta - Enhanced Marketing Detection)", {
+  pwLog("content.js loaded (Phase 4 v2.6.2 - Security Hardened)", {
     origin: window.location.origin,
     phase4_send_research_to_backend: PHASE4_SEND_RESEARCH_TO_BACKEND,
     phase4_show_research_in_ui: PHASE4_SHOW_RESEARCH_IN_UI,

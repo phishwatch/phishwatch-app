@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Marketing Allowlist v2.6.3-beta</title>
+</head>
+<body>
+  <h1>PhishWatch Marketing Allowlist Test</h1>
+  <p>Open browser console to see debug output</p>
+  
+  <h2>Test Links (Click to test allowlist detection)</h2>
+  
+  <h3>Email Service Providers</h3>
+  <a href="https://click.sendgrid.net/test123" target="_blank">SendGrid Click Tracking</a><br>
+  <a href="https://track.mailgun.org/click/abc" target="_blank">Mailgun Tracking</a><br>
+  <a href="https://email.mailchimp.com/campaign" target="_blank">Mailchimp Email</a><br>
+  
+  <h3>Marketing Automation</h3>
+  <a href="https://click.hubspot.com/track/123" target="_blank">HubSpot Click</a><br>
+  <a href="https://email.marketo.com/campaign" target="_blank">Marketo Email</a><br>
+  <a href="https://go.pardot.com/track" target="_blank">Pardot Tracking</a><br>
+  
+  <h3>E-commerce</h3>
+  <a href="https://email.shopify.com/order/123" target="_blank">Shopify Order</a><br>
+  <a href="https://store.myshopify.com/products" target="_blank">Shopify Store</a><br>
+  
+  <h3>Travel & Hospitality</h3>
+  <a href="https://email.expedia.com/booking/123" target="_blank">Expedia Booking</a><br>
+  <a href="https://email-marriott.com/confirmation" target="_blank">Marriott Email</a><br>
+  
+  <h3>Financial Services</h3>
+  <a href="https://email.paypal.com/receipt" target="_blank">PayPal Receipt</a><br>
+  <a href="https://email.stripe.com/invoice" target="_blank">Stripe Invoice</a><br>
+  
+  <h3>Analytics</h3>
+  <a href="https://track.google-analytics.com/event" target="_blank">Google Analytics</a><br>
+  
+  <h3>Non-Marketing (Should NOT be allowlisted)</h3>
+  <a href="https://suspicious-site.com/login" target="_blank">Suspicious Site</a><br>
+  <a href="https://phishing.test/credentials" target="_blank">Phishing Test</a><br>
+  
+  <script>
+    console.log('=================================');
+    console.log('PhishWatch Marketing Allowlist Test Page');
+    console.log('v2.6.3-beta - Enhanced Marketing Detection');
+    console.log('=================================');
+    console.log('Click on the test links above to see marketing allowlist in action.');
+    console.log('Look for: [PhishWatch] Marketing domain allowlisted: ...');
+    console.log('=================================');
+  </script>
+</body>
+</html>
