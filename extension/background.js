@@ -1,12 +1,35 @@
 // background.js — PhishWatch (Dev) + Test Helper (fixed routing + ping + aliases)
-console.log("[PhishWatch] BACKGROUND VERSION: 2026-02-04-PHASE2-TESTHELPER-FIXED");
+console.log("[PhishWatch] BACKGROUND VERSION: 2026-02-10-RENDER-VERIFY-REQID");
 
-const API_BASE = "http://127.0.0.1:8080";
-const API_TIMEOUT_MS = 8000;
+// ✅ Set this to your Render service base URL
+const API_BASE = "https://phishwatch-app.onrender.com";
+
+// Render free cold-start can be ~50s+. Keep this high during verification.
+// You can lower later once you’re on paid / warmed infra.
+const API_TIMEOUT_MS = 65000;
+
+// --- Warmup: reduce Render cold-start impact (silent) ---
+async function warmup() {
+  try {
+    const r = await fetch(`${API_BASE}/health`, { method: "GET" });
+    console.log("[PhishWatch] warmup /health", { ok: r.ok, status: r.status });
+  } catch (e) {
+    console.warn("[PhishWatch] warmup failed", String(e));
+  }
+}
+
+warmup();
+chrome.runtime.onStartup?.addListener(warmup);
+chrome.runtime.onInstalled?.addListener(warmup);
 
 async function apiCheck(inputUrl, ctx = {}) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  // Correlate browser DevTools ↔ Render logs
+  const reqId =
+    (ctx && ctx.req_id) ||
+    `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
   try {
     const payload = {
@@ -18,31 +41,46 @@ async function apiCheck(inputUrl, ctx = {}) {
       treadmill: ctx?.treadmill || null,
     };
 
-    console.log("[PhishWatch] apiCheck payload", payload);
+    const checkUrl = `${API_BASE}/api/check`;
+    console.log("[PhishWatch] apiCheck ->", { reqId, checkUrl, payload });
 
-    const r = await fetch(`${API_BASE}/api/check`, {
+    const r = await fetch(checkUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-PhishWatch-ReqId": reqId,
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
 
     const text = await r.text().catch(() => "");
     if (!r.ok) {
-      console.warn("[PhishWatch] apiCheck failed", { status: r.status, body: text });
+      console.warn("[PhishWatch] apiCheck failed", { reqId, status: r.status, body: text });
       throw new Error(`API ${r.status}: ${text || "request failed"}`);
     }
 
-    return text ? JSON.parse(text) : null;
+    const out = text ? JSON.parse(text) : null;
+    console.log("[PhishWatch] apiCheck ok", { reqId, risk_band: out?.risk_band, verdict: out?.verdict });
+    return out;
   } catch (e) {
     if (String(e?.name) === "AbortError") {
-      throw new Error(`API timeout after ${API_TIMEOUT_MS}ms`);
+      throw new Error(`API timeout after ${API_TIMEOUT_MS}ms (reqId=${reqId})`);
     }
     throw e;
   } finally {
     clearTimeout(t);
   }
 }
+
+// --- DEBUG: expose helpers to DevTools console (because service worker is type: "module") ---
+globalThis.PW_API_BASE = API_BASE;
+globalThis.pwApiCheck = apiCheck;
+globalThis.pwDebugScan = async (url = "https://example.com") => {
+  const out = await apiCheck(url, { req_id: `dbg-${Date.now()}` });
+  console.log("[PhishWatch] pwDebugScan result", out);
+  return out;
+};
 
 // --- session allowlist helpers (chrome.storage.session) ---
 async function getAllowlist() {
@@ -116,7 +154,7 @@ async function handleTestHelper(actionRaw, payload = {}) {
   console.log("[PhishWatch] Test helper action:", normalized, payload);
 
   if (normalized === "ping") {
-    return { ok: true, data: { alive: true, ts: Date.now(), version: "2026-02-04-PHASE2-TESTHELPER-FIXED" } };
+    return { ok: true, data: { alive: true, ts: Date.now(), version: "2026-02-10-RENDER-VERIFY-REQID" } };
   }
 
   if (normalized === "storage.getAll") {
@@ -205,6 +243,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // keep channel open
   }
 
+  // 1.5) DEBUG SCAN (manual backend test)
+  if (msg?.type === "PHISHWATCH_DEBUG_SCAN") {
+    (async () => {
+      try {
+        console.log("[PhishWatch] DEBUG SCAN start", msg.url);
+        const out = await apiCheck(msg.url || "https://example.com", { req_id: `dbg-${Date.now()}` });
+        console.log("[PhishWatch] DEBUG SCAN result", out);
+        sendResponse({ ok: true, data: out });
+      } catch (e) {
+        console.error("[PhishWatch] DEBUG SCAN error", e);
+        sendResponse({ ok: false, error: String(e?.message || e) });
+      }
+    })();
+    return true; // keep channel open
+  }
+
   // 2) SESSION RPC (allowlist)
   if (msg?.type === "PHISHWATCH_SESSION_RPC") {
     (async () => {
@@ -246,13 +300,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           return;
         }
 
+        const reqId = `scan-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
         console.log("[PhishWatch] SCAN start", {
+          reqId,
           url,
+          apiCheckUrl: `${API_BASE}/api/check`,
           is_marketing_infra: msg.is_marketing_infra,
           has_treadmill: !!msg.treadmill,
         });
 
         const data = await apiCheck(url, {
+          req_id: reqId,
           redirect_count: msg.redirect_count ?? 0,
           client_signals: msg.client_signals ?? [],
           prescan_reasons: msg.prescan_reasons ?? [],
@@ -261,6 +320,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         });
 
         console.log("[PhishWatch] SCAN done", {
+          reqId,
           url,
           risk_band: data?.risk_band,
           treadmill_escalated: data?.treadmill_escalated,

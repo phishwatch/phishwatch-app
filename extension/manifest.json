@@ -7,10 +7,9 @@
   "permissions": ["scripting", "storage"],
 
   "host_permissions": [
+    "https://phishwatch-app.onrender.com/*",
     "http://127.0.0.1:*/*",
-    "http://localhost:*/*",
-    "http://*/*",
-    "https://*/*"
+    "http://localhost:*/*"
   ],
 
   "background": {
