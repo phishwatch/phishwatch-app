@@ -118,8 +118,8 @@
 
   // Timing constants
   var SOFT_INDICATOR_DELAY_MS = 800;
-  var HARD_TIMEOUT_MS = 2000;
-  var API_TIMEOUT_MS = 8000;
+  var HARD_TIMEOUT_MS = 70000;
+  var API_TIMEOUT_MS = 65000;
 
   // Treadmill timing constants
   var AUTH_WINDOW_PRE_SUBMIT_MS = 2000;
@@ -2926,7 +2926,7 @@ function incrementBaseline(pageOrigin, hash) {
 
       // DEBUG ONLY: set to true to force scanning on *all* outbound clicks
       // (useful to confirm service-worker network /api/check activity).
-      var DEBUG_FORCE_SCAN_ALL_OUTBOUND = true;
+      var DEBUG_FORCE_SCAN_ALL_OUTBOUND = false;
 
       var a = findAnchor(evt.target);
       if (!a) return;
@@ -2994,9 +2994,11 @@ function incrementBaseline(pageOrigin, hash) {
       // Normal behavior: no hints => allow
       // Debug behavior: force scan outbound even with no hints
       if (!hints.length && !hasRecentSuspiciousCopy && !DEBUG_FORCE_SCAN_ALL_OUTBOUND) {
-        pwLog("onClickCapture: no hints, allowing", { url: url });
-        return;
-      }
+      // No hints, but we still scan so /api/check is triggered.
+      // Low risk will navigate silently after result.
+      pwLog("onClickCapture: no hints; scanning anyway", { url: url });
+    }
+
 
       // Rapid click protection: ONLY debounce links we're actually intercepting
       var now2 = Date.now();
